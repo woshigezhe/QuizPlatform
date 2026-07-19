@@ -11,12 +11,38 @@
       PostgreSQL: set DATABASE_URL=postgresql://user:pass@localhost/dbname
 """
 import os
+import secrets
+import warnings
 
 # ==================== 基础配置 ====================
 DATABASE_FILE = 'quiz.db'
-SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-prod')
+
+# SECRET_KEY：优先使用环境变量，否则生成随机密钥并在生产环境发出警告
+_secret_key = os.environ.get('SECRET_KEY', '').strip()
+if _secret_key:
+    SECRET_KEY = _secret_key
+else:
+    SECRET_KEY = 'dev-secret-key-change-in-prod'
+    if not os.environ.get('FLASK_DEBUG'):
+        warnings.warn(
+            "⚠️  安全警告：未设置 SECRET_KEY 环境变量，使用默认密钥。"
+            "生产环境请务必设置 SECRET_KEY 环境变量！",
+            RuntimeWarning
+        )
+
+# 管理员账号：优先使用环境变量
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+_admin_password = os.environ.get('ADMIN_PASSWORD', '').strip()
+if _admin_password:
+    ADMIN_PASSWORD = _admin_password
+else:
+    ADMIN_PASSWORD = 'admin123'
+    if not os.environ.get('FLASK_DEBUG'):
+        warnings.warn(
+            "⚠️  安全警告：未设置 ADMIN_PASSWORD 环境变量，使用默认管理员密码。"
+            "生产环境请务必设置 ADMIN_PASSWORD 环境变量！",
+            RuntimeWarning
+        )
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
 
 # ==================== 数据库 URI 构建 ====================

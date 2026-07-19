@@ -44,7 +44,15 @@ if __name__ == '__main__':
     with app.app_context():
         from utils import init_db
         init_db()
+    
+    # debug 模式通过 FLASK_DEBUG 环境变量控制，默认关闭（生产安全）
+    debug_mode = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
+    
     print(f"服务器运行在 http://127.0.0.1:5000")
     from config import ADMIN_USERNAME, ADMIN_PASSWORD
     print(f"默认管理员：{ADMIN_USERNAME} / {ADMIN_PASSWORD}")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    
+    if debug_mode:
+        print("⚠️  DEBUG 模式已开启，仅限开发环境使用！")
+    
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
