@@ -8,6 +8,7 @@ from flask_login import LoginManager
 from config import Config
 from models import db
 from routes import register_routes
+from routes.api import register_api
 import os
 
 # ==================== 初始化应用 ====================
@@ -22,6 +23,7 @@ login_manager.login_view = 'auth.auth_login'
 
 # 注册路由
 register_routes(app)
+register_api(app)
 
 # ==================== 模板初始化 ====================
 TEMPLATES_DIR = 'templates'
