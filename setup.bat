@@ -37,10 +37,10 @@ if %errorlevel% equ 0 (
     goto :eof
 )
 
-curl -s --connect-timeout 2 https://pypi.mirrors.ustc.edu.cn >nul 2>&1
+curl -s --connect-timeout 2 https://mirrors.cloud.tencent.com >nul 2>&1
 if %errorlevel% equ 0 (
-    set "PIP_INDEX=-i https://pypi.mirrors.ustc.edu.cn/simple"
-    echo ✔ 使用中科大镜像
+    set "PIP_INDEX=-i https://mirrors.cloud.tencent.com/pypi/simple"
+    echo ✔ 使用腾讯云镜像
     goto :eof
 )
 
@@ -419,8 +419,8 @@ echo ============================================
 echo.
 echo   GitHub 访问缓慢/失败时，使用镜像代理克隆:
 echo.
-echo   ghproxy.com:
-echo     git clone https://ghproxy.com/https://github.com/xybbb/QuizPlatform.git
+echo   gitclone.com:
+echo     git clone https://gitclone.com/github.com/xybbb/QuizPlatform.git
 echo.
 echo   cnpmjs.org:
 echo     git clone https://github.com.cnpmjs.org/xybbb/QuizPlatform.git

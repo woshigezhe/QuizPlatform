@@ -44,7 +44,6 @@ detect_pip_mirror() {
     local mirrors=(
         "https://pypi.tuna.tsinghua.edu.cn/simple|清华"
         "https://mirrors.aliyun.com/pypi/simple|阿里云"
-        "https://pypi.mirrors.ustc.edu.cn/simple|中科大"
         "https://mirrors.cloud.tencent.com/pypi/simple|腾讯云"
     )
 
@@ -469,8 +468,8 @@ github_clone_helper() {
     echo ""
 
     local mirrors=(
-        "ghproxy.com      | git clone https://ghproxy.com/https://github.com/xybbb/QuizPlatform.git"
-        "cnpmjs.org       | git clone https://github.com.cnpmjs.org/xybbb/QuizPlatform.git"
+        "gitclone.com      | git clone https://gitclone.com/github.com/xybbb/QuizPlatform.git"
+        "cnpmjs.org        | git clone https://github.com.cnpmjs.org/xybbb/QuizPlatform.git"
     )
 
     for entry in "${mirrors[@]}"; do

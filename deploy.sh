@@ -63,7 +63,7 @@ detect_pip_mirror() {
     local mirrors=(
         "https://pypi.tuna.tsinghua.edu.cn/simple|清华"
         "https://mirrors.aliyun.com/pypi/simple|阿里云"
-        "https://pypi.mirrors.ustc.edu.cn/simple|中科大"
+        "https://mirrors.cloud.tencent.com/pypi/simple|腾讯云"
     )
     for entry in "${mirrors[@]}"; do
         local url="${entry%%|*}"
@@ -85,21 +85,12 @@ detect_github_mirror() {
         GIT_MIRROR_FLAG=""
         return
     fi
-    local git_mirrors=(
-        "https://ghproxy.com/https://github.com|ghproxy.com"
-        "https://github.com.cnpmjs.org|cnpmjs.org"
-    )
-    for entry in "${git_mirrors[@]}"; do
-        local url="${entry%%|*}"
-        local name="${entry##*|}"
-        local test_url="${url}/status"
-        if curl -s --connect-timeout 3 "$test_url" > /dev/null 2>&1; then
-            GIT_MIRROR_FLAG="-c url.${url}.insteadOf=https://github.com/"
-            success "使用 GitHub 镜像: ${name}"
-            return
-        fi
-    done
-    warn "GitHub 不可达且无可用的镜像代理"
+    if curl -s --connect-timeout 3 https://gitclone.com > /dev/null 2>&1; then
+        GIT_MIRROR_FLAG="-c url.https://gitclone.com/github.com/.insteadOf=https://github.com/"
+        success "使用 GitHub 镜像: gitclone.com"
+        return
+    fi
+    warn "GitHub 不可达且无可用镜像代理"
     GIT_MIRROR_FLAG=""
 }
 

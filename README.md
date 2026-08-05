@@ -112,8 +112,7 @@ git clone https://github.com/woshigezhe/QuizPlatform.git
 cd QuizPlatform
 
 # 国内网络慢可用镜像：
-#   git clone https://ghproxy.com/https://github.com/woshigezhe/QuizPlatform.git
-#   git clone https://github.com.cnpmjs.org/woshigezhe/QuizPlatform.git
+#   git clone https://gitclone.com/github.com/woshigezhe/QuizPlatform.git
 
 # 安装依赖（--only-binary 可避免需要 C++ 编译器）
 pip install -r requirements.txt --only-binary :all:
