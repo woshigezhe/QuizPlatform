@@ -93,11 +93,12 @@ echo ║  [6] 环境信息 / 配置检查                      ║
 echo ║  [7] 进入 Python 交互环境                     ║
 echo ║  [8] 一键启动 (安装+初始化+启动开发服)        ║
 echo ║  [9] 前端开发服务器 (Vue 3 + Vite)            ║
+echo ║  [G] GitHub 镜像克隆助手                       ║
 echo ║  [0] 退出                                     ║
 echo ║                                              ║
 echo ╚══════════════════════════════════════════════╝
 echo.
-set /p choice="请输入选项编号 [0-9]: "
+set /p choice="请输入选项编号 [0-9/G]: "
 
 if "%choice%"=="1" goto install_deps
 if "%choice%"=="2" goto init_db
@@ -108,6 +109,7 @@ if "%choice%"=="6" goto show_info
 if "%choice%"=="7" goto python_shell
 if "%choice%"=="8" goto one_click
 if "%choice%"=="9" goto frontend_dev
+if /i "%choice%"=="g" goto github_clone_helper
 if "%choice%"=="0" goto exit_script
 echo 无效选项，请重新选择
 timeout /t 2 >nul
@@ -405,6 +407,27 @@ echo.
 cd frontend
 call npm run dev
 cd ..
+pause
+goto main_menu
+
+:: ==================== [G] GitHub 克隆助手 ====================
+:github_clone_helper
+echo.
+echo ============================================
+echo  [G] GitHub 镜像克隆助手
+echo ============================================
+echo.
+echo   GitHub 访问缓慢/失败时，使用镜像代理克隆:
+echo.
+echo   ghproxy.com:
+echo     git clone https://ghproxy.com/https://github.com/xybbb/QuizPlatform.git
+echo.
+echo   cnpmjs.org:
+echo     git clone https://github.com.cnpmjs.org/xybbb/QuizPlatform.git
+echo.
+echo   克隆后进入项目:
+echo     cd QuizPlatform ^&^& setup.bat
+echo.
 pause
 goto main_menu
 

@@ -135,6 +135,7 @@ main_menu() {
     echo -e "${BOLD}║  [7] 进入 Python 交互环境                     ║${NC}"
     echo -e "${BOLD}║  [8] 一键启动 (安装+初始化+启动开发服)        ║${NC}"
     echo -e "${BOLD}║  [9] 前端开发服务器 (Vue 3 + Vite)            ║${NC}"
+    echo -e "${BOLD}║  [G] GitHub 镜像克隆助手                       ║${NC}"
     echo -e "${BOLD}║  [0] 退出                                     ║${NC}"
     echo -e "${BOLD}║                                              ║${NC}"
     echo -e "${BOLD}╚══════════════════════════════════════════════╝${NC}"
@@ -151,6 +152,7 @@ main_menu() {
         7) python_shell ;;
         8) one_click ;;
         9) frontend_dev ;;
+        g|G) github_clone_helper ;;
         0) exit_script ;; 
         *) echo -e "${RED}无效选项，请重新选择${NC}"; sleep 1; main_menu ;;
     esac
@@ -452,6 +454,34 @@ frontend_dev() {
 
     cd frontend && npm run dev
     cd "$PROJECT_DIR"
+    read -p "按 Enter 返回主菜单..." _
+    main_menu
+}
+
+# ==================== [G] GitHub 克隆助手 ====================
+github_clone_helper() {
+    echo ""
+    echo "============================================"
+    header "[G] GitHub 镜像克隆助手"
+    echo "============================================"
+    echo ""
+    echo "  GitHub 访问缓慢/失败时，使用镜像代理克隆:"
+    echo ""
+
+    local mirrors=(
+        "ghproxy.com      | git clone https://ghproxy.com/https://github.com/xybbb/QuizPlatform.git"
+        "cnpmjs.org       | git clone https://github.com.cnpmjs.org/xybbb/QuizPlatform.git"
+    )
+
+    for entry in "${mirrors[@]}"; do
+        echo -e "  ${GREEN}${entry%%|*}${NC}"
+        echo "  ${entry##*|}"
+        echo ""
+    done
+
+    echo "  克隆后进入项目:"
+    echo "  cd QuizPlatform && bash setup.sh"
+    echo ""
     read -p "按 Enter 返回主菜单..." _
     main_menu
 }

@@ -79,6 +79,30 @@ detect_pip_mirror() {
     PIP_INDEX=""
 }
 
+detect_github_mirror() {
+    info "检测 GitHub 可达性..."
+    if curl -s --connect-timeout 3 https://github.com > /dev/null 2>&1; then
+        GIT_MIRROR_FLAG=""
+        return
+    fi
+    local git_mirrors=(
+        "https://ghproxy.com/https://github.com|ghproxy.com"
+        "https://github.com.cnpmjs.org|cnpmjs.org"
+    )
+    for entry in "${git_mirrors[@]}"; do
+        local url="${entry%%|*}"
+        local name="${entry##*|}"
+        local test_url="${url}/status"
+        if curl -s --connect-timeout 3 "$test_url" > /dev/null 2>&1; then
+            GIT_MIRROR_FLAG="-c url.${url}.insteadOf=https://github.com/"
+            success "使用 GitHub 镜像: ${name}"
+            return
+        fi
+    done
+    warn "GitHub 不可达且无可用的镜像代理"
+    GIT_MIRROR_FLAG=""
+}
+
 # ==================== 显示帮助 ====================
 show_help() {
     echo "QuizPlatform 生产部署脚本"
@@ -202,7 +226,8 @@ cd "$PROJECT_DIR" || error "项目目录不存在: $PROJECT_DIR"
 # ==================== [1] 拉取代码 ====================
 if [ "$DO_PULL" = true ]; then
     echo "━━━ [1/3] 拉取最新代码 ━━━"
-    git fetch origin main 2>/dev/null || warn "git fetch 失败，跳过"
+    detect_github_mirror
+    git $GIT_MIRROR_FLAG fetch origin main 2>/dev/null || warn "git fetch 失败，跳过"
 
     LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
     REMOTE=$(git rev-parse origin/main 2>/dev/null || echo "unknown")
@@ -211,7 +236,7 @@ if [ "$DO_PULL" = true ]; then
         success "代码已是最新 ($(echo $LOCAL | head -c 8))"
     else
         info "检测到更新，拉取代码..."
-        git pull origin main && success "代码已更新" || warn "git pull 失败"
+        git $GIT_MIRROR_FLAG pull origin main && success "代码已更新" || warn "git pull 失败"
     fi
     echo ""
 fi
