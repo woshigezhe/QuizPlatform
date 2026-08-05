@@ -7,10 +7,11 @@
 | 层级 | 技术 |
 |------|------|
 | Web框架 | Flask |
-| ORM | SQLAlchemy (Flask-SQLAlchemy) |
+| ORM | SQLAlchemy (Flask-SQLAlchemy, 多 bind 支持) |
 | 认证 | Flask-Login |
 | 模板引擎 | Jinja2 |
 | 数据库 | 默认 SQLite，支持 MySQL/PostgreSQL |
+| 数据分离 | 配置 / 用户 / 题库数据可分离存储 |
 | 数据导入导出 | pandas + openpyxl |
 
 ## 项目结构
@@ -19,24 +20,38 @@
 QuizPlatform/
 ├── app.py              # 主入口（应用初始化 + 路由注册）
 ├── config.py           # 配置管理（密钥、数据库URI、管理员账号）
-├── models.py           # 数据库模型（6张核心表）
+├── models.py           # 数据库模型（7张核心表）
 ├── utils.py            # 辅助函数（权限装饰器、答案判定、数据库初始化）
 ├── routes/             # 路由模块
-│   ├── __init__.py     # 路由注册中心（3个蓝图）
+│   ├── __init__.py     # 路由注册中心（Flask蓝图 + 全局中间件）
+│   ├── shared.py       # 公共工具（输入验证、文件上传辅助函数）
 │   ├── auth.py         # 认证路由（登录/注册/注销）
 │   ├── quiz.py         # 核心答题路由（答题/分组/排行榜/学习路线）
-│   └── admin.py        # 管理后台路由（CRUD + 导入导出 + 用户管理）
-├── templates/          # Jinja2 HTML 模板
-│   ├── base.html       # 基础布局
+│   ├── admin.py        # 管理后台路由（CRUD + 导入导出 + 用户管理）
+│   └── api/            # RESTful API 路由（前后端分离）
+│       ├── __init__.py # API 蓝图注册
+│       ├── auth.py     # API 认证接口
+│       ├── quiz.py     # API 答题接口
+│       └── admin.py    # API 管理后台接口
+├── frontend/           # Vue 3 前端（前后端分离模式）
+│   ├── src/
+│   │   ├── api/        # API 请求封装
+│   │   ├── stores/     # Pinia 状态管理
+│   │   ├── views/      # Vue 页面组件
+│   │   └── router/     # Vue Router 路由配置
+│   ├── package.json
+│   └── vite.config.js
+├── templates/          # Jinja2 HTML 模板（传统服务端渲染）
+│   ├── base.html       # 基础布局（玻璃拟态 + 动态背景）
 │   ├── index.html      # 首页（分类展示）
 │   ├── login.html      # 登录页
 │   ├── register.html   # 注册页
 │   ├── quiz.html       # 答题页
-│   ├── result.html     # 答题结果页
+│   ├── result.html     # 答题结果页（全对动画）
 │   ├── history.html    # 答题历史记录
 │   ├── roadmap.html    # 题组学习路线图
 │   ├── study.html      # 学习资料页
-│   ├── leaderboard.html # 排行榜
+│   ├── leaderboard.html # 排行榜（领奖台 + 排名表）
 │   └── admin/          # 管理后台模板
 │       ├── dashboard.html
 │       ├── categories.html
@@ -46,12 +61,18 @@ QuizPlatform/
 │       ├── question_form.html
 │       ├── import.html
 │       ├── export.html
-│       └── users.html
+│       ├── users.html
+│       └── history.html
 ├── static/             # 静态资源（CSS/JS/图标/背景图）
+│   ├── import_prompt.txt
 │   └── icons/
 ├── uploads/            # 上传文件目录
 ├── instance/           # SQLite 数据库文件（运行时生成）
 ├── requirements.txt    # Python 依赖
+├── runcode.json        # OpenCode 配置文件
+├── setup.bat           # Windows 一键安装脚本
+├── setup.sh            # Linux/macOS 一键安装脚本
+├── deploy.sh           # 生产环境部署脚本
 └── .gitignore
 ```
 
@@ -137,16 +158,75 @@ python app.py
 - ✅ 自定义背景图片（题组答题页）
 - ✅ 管理员权限保护（`admin_required` 装饰器）
 
-## 数据库切换
+## 环境配置
 
-默认使用 SQLite，切换为 MySQL 或 PostgreSQL 只需设置环境变量：
+### 自动环境识别
+
+系统会根据以下规则自动判断当前运行环境：
+
+| 触发条件 | 环境 |
+|----------|------|
+| `ENV=production` | 生产环境 |
+| `FLASK_DEBUG=1` 或 `ENV=development` | 开发环境 |
+| 通过 `gunicorn` 启动 | 生产环境 |
+| 默认 | 开发环境 |
+
+### 开发环境（默认）
+
+无需任何配置，直接 `python app.py` 启动：
+- 数据库：SQLite（`instance/quiz.db`）
+- SECRET_KEY：使用默认值
+- 管理员密码：`admin123`
+
+### 生产环境
+
+```bash
+# 方式一：设置环境标识
+export ENV=production
+
+# 方式二：通过 gunicorn 启动自动识别
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+#### 生产环境数据库配置
+
+**选项 A：使用 DATABASE_URL（推荐）**
 
 ```bash
 # MySQL
-set DATABASE_URL=mysql+pymysql://user:password@localhost/dbname
+export DATABASE_URL=mysql+pymysql://user:password@db-server:3306/quiz_platform
 
 # PostgreSQL
-set DATABASE_URL=postgresql://user:password@localhost/dbname
+export DATABASE_URL=postgresql://user:password@db-server:5432/quiz_platform
+```
+
+**选项 B：使用单独的环境变量**
+
+```bash
+export DB_TYPE=mysql           # mysql 或 postgresql
+export DB_HOST=db-server
+export DB_PORT=3306
+export DB_USER=quiz_user
+export DB_PASS=your_password
+export DB_NAME=quiz_platform
+```
+
+**选项 C：数据物理分离（可选高级功能）**
+
+将题库配置、用户数据、答题记录分别存储到不同数据库：
+
+```bash
+export CONFIG_DATABASE_URL=mysql+pymysql://user:pass@db1/config_db
+export USERS_DATABASE_URL=mysql+pymysql://user:pass@db2/users_db
+export RECORDS_DATABASE_URL=mysql+pymysql://user:pass@db3/records_db
+```
+
+#### 生产环境安全配置
+
+```bash
+export SECRET_KEY=your-random-secret-key-here
+export ADMIN_PASSWORD=your-strong-admin-password
+export ADMIN_EMAIL=admin@yourdomain.com
 ```
 
 ## 批量导入格式
@@ -168,4 +248,17 @@ set DATABASE_URL=postgresql://user:password@localhost/dbname
 
 ## 架构说明
 
-本项目采用 MVC 分层架构，原为单文件项目（约 2000 行），已重构为模块化结构。
+本项目采用 MVC 分层架构 + RESTful API 双模式设计：
+
+- **传统服务端渲染**：`routes/` 目录下的 Flask 蓝图 + Jinja2 模板，适合直接部署使用
+- **前后端分离**：`routes/api/` 目录下的 RESTful API + `frontend/` 目录下的 Vue 3 单页应用
+- **公共模块**：`routes/shared.py` 消除路由层和 API 层的代码重复（输入验证、文件上传）
+
+## 安全特性
+
+- Open Redirect 防护：登录重定向 URL 必须为相对路径
+- 用户禁用即时生效：管理员禁用用户后，其现有会话立即失效（`before_request` 中间件）
+- 会话完整性：所有 session 写入操作均标记 `modified=True`
+- 事务完整性：进度删除操作与答题记录创建在同一事务中提交，避免数据不一致
+- 日期输入校验：管理后台的日期筛选字段有格式校验和友好的错误提示
+- Eager Loading：答题历史查询预加载关联数据，避免 N+1 查询问题

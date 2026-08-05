@@ -7,13 +7,11 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 from datetime import datetime
-import os
 from models import db, Category, Group, Question, QuizRecord, QuizDetail, UserProgress, User
 from utils import check_answer
 
 quiz_bp = Blueprint('quiz', __name__)
 
-TEMPLATES_DIR = 'templates'
 
 @quiz_bp.route('/')
 def index():
@@ -63,6 +61,12 @@ def start_quiz(category_id):
     if not questions:
         flash('该分类下暂无题目')
         return redirect(url_for('quiz.index'))
+
+    # 标记旧的进行中记录为已放弃（防止孤立数据）
+    QuizRecord.query.filter_by(user_id=current_user.id, end_time=None).update(
+        {QuizRecord.end_time: datetime.utcnow()}, synchronize_session=False
+    )
+
     record = QuizRecord(user_id=current_user.id, category_id=category_id, total_questions=len(questions))
     db.session.add(record)
     db.session.commit()
@@ -71,6 +75,7 @@ def start_quiz(category_id):
     session['current_index'] = 0
     session['answers'] = {}
     session['group_mode'] = False
+    session.modified = True
     return redirect(url_for('quiz.do_quiz'))
 
 @quiz_bp.route('/group_quiz/<int:category_id>')
@@ -98,25 +103,26 @@ def group_quiz(category_id):
         return redirect(url_for('quiz.index'))
 
     progress = UserProgress.query.filter_by(user_id=current_user.id, category_id=category_id).first()
+    should_reset_progress = False
     start_group_index = 0
     if progress and progress.last_completed_group_id:
         for idx, g in enumerate(group_questions):
             if g['group_id'] == progress.last_completed_group_id:
                 if idx == len(group_questions) - 1:
-                    db.session.delete(progress)
-                    db.session.commit()
+                    should_reset_progress = True
                     start_group_index = 0
                 else:
                     start_group_index = idx + 1
                 break
         else:
-            db.session.delete(progress)
-            db.session.commit()
+            should_reset_progress = True
             start_group_index = 0
 
     current_group_question_count = len(group_questions[start_group_index]['question_ids'])
     record = QuizRecord(user_id=current_user.id, category_id=category_id, total_questions=current_group_question_count)
     db.session.add(record)
+    if should_reset_progress and progress:
+        db.session.delete(progress)
     db.session.commit()
 
     session['quiz_record_id'] = record.id
@@ -292,10 +298,6 @@ def finish_group():
         progress.last_completed_group_id = group_info['group_id']
         db.session.commit()
 
-    # 存储题组结果信息，供结果页面展示
-    session['group_result_all_correct'] = all_correct
-    session['group_result_name'] = group_info['group_name']
-
     # 清理 session 中的答题数据
     session.pop('question_ids', None)
     session.pop('group_question_ids', None)
@@ -307,7 +309,9 @@ def finish_group():
     session.pop('current_group', None)
     session.modified = True
 
-    return redirect(url_for('quiz.result', record_id=record.id))
+    return redirect(url_for('quiz.result', record_id=record.id,
+                            group_name=group_info['group_name'],
+                            all_correct='1' if all_correct else '0'))
 
 @quiz_bp.route('/submit_quiz')
 @login_required
@@ -360,9 +364,9 @@ def result(record_id):
         flash('无权查看')
         return redirect(url_for('quiz.index'))
 
-    # 从 session 获取题组结果信息（题组模式才有）
-    group_all_correct = session.pop('group_result_all_correct', None)
-    group_name = session.pop('group_result_name', None)
+    # 从 URL 参数获取题组结果信息（刷新页面时不会丢失）
+    group_all_correct = request.args.get('all_correct') == '1'
+    group_name = request.args.get('group_name')
 
     # 检查该分类是否有学习路线（题组）
     has_roadmap = False
@@ -483,7 +487,9 @@ def start_group(group_id):
 @quiz_bp.route('/history')
 @login_required
 def history():
-    records = QuizRecord.query.filter_by(user_id=current_user.id).order_by(QuizRecord.start_time.desc()).all()
+    records = QuizRecord.query.filter_by(user_id=current_user.id).options(
+        joinedload(QuizRecord.category)
+    ).order_by(QuizRecord.start_time.desc()).all()
     return render_template('history.html', records=records)
 
 
@@ -502,7 +508,7 @@ def leaderboard():
         func.coalesce(func.sum(QuizRecord.total_questions), 0).label('total_questions'),
         func.coalesce(func.sum(QuizRecord.correct_count), 0).label('total_correct')
     ).join(QuizRecord, User.id == QuizRecord.user_id, isouter=True
-    ).filter((QuizRecord.id == None) | (QuizRecord.end_time != None)
+    ).filter((QuizRecord.id.is_(None)) | (QuizRecord.end_time != None)
     ).group_by(User.id).order_by(func.sum(QuizRecord.score).desc()).all()
     
     # 计算排名数据

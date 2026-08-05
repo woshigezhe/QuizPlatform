@@ -90,7 +90,12 @@ def api_start_quiz():
     
     if not questions:
         return _api_error('该分类下暂无题目')
-    
+
+    # 标记旧的进行中记录为已放弃（防止孤立数据）
+    QuizRecord.query.filter_by(user_id=current_user.id, end_time=None).update(
+        {QuizRecord.end_time: datetime.utcnow()}, synchronize_session=False
+    )
+
     record = QuizRecord(
         user_id=current_user.id,
         category_id=category_id,
@@ -552,7 +557,7 @@ def api_leaderboard():
         func.coalesce(func.sum(QuizRecord.total_questions), 0).label('total_questions'),
         func.coalesce(func.sum(QuizRecord.correct_count), 0).label('total_correct')
     ).join(QuizRecord, User.id == QuizRecord.user_id, isouter=True
-    ).filter((QuizRecord.id == None) | (QuizRecord.end_time != None)
+    ).filter((QuizRecord.id.is_(None)) | (QuizRecord.end_time != None)
     ).group_by(User.id).order_by(func.sum(QuizRecord.score).desc()).all()
     
     ranked_users = []

@@ -18,10 +18,10 @@
 import { Grid, Collection, Document, User } from '@element-plus/icons-vue'
 
 const menuItems = [
-  { path: '/admin/categories', label: '分类管理', icon: 'Grid' },
-  { path: '/admin/groups', label: '分组管理', icon: 'Collection' },
-  { path: '/admin/questions', label: '题目管理', icon: 'Document' },
-  { path: '/admin/users', label: '用户管理', icon: 'User' },
+  { path: '/admin/categories', label: '分类管理', icon: Grid },
+  { path: '/admin/groups', label: '分组管理', icon: Collection },
+  { path: '/admin/questions', label: '题目管理', icon: Document },
+  { path: '/admin/users', label: '用户管理', icon: User },
 ]
 </script>
 

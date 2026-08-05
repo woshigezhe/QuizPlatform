@@ -50,8 +50,10 @@ if __name__ == '__main__':
     # debug 模式通过 FLASK_DEBUG 环境变量控制，默认关闭（生产安全）
     debug_mode = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
     
+    from config import print_env_info, ADMIN_USERNAME, ADMIN_PASSWORD
+    print_env_info()
+    print()
     print(f"服务器运行在 http://127.0.0.1:5000")
-    from config import ADMIN_USERNAME, ADMIN_PASSWORD
     print(f"默认管理员：{ADMIN_USERNAME} / {ADMIN_PASSWORD}")
     
     if debug_mode:

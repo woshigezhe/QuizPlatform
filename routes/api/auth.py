@@ -3,19 +3,12 @@
 """
 API 认证接口
 """
-import re
 from flask import request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User
 from . import api_bp
-
-# 输入验证常量
-USERNAME_MIN_LEN = 3
-USERNAME_MAX_LEN = 20
-PASSWORD_MIN_LEN = 6
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-USERNAME_REGEX = re.compile(r'^[a-zA-Z0-9_\u4e00-\u9fff]+$')
+from ..shared import validate_registration
 
 
 def _api_error(message, code=400):
@@ -29,39 +22,14 @@ def _api_success(data=None, message='ok'):
     return jsonify(resp)
 
 
-def _validate_registration(username, email, password):
-    errors = []
-    username = username.strip() if username else ''
-    email = email.strip() if email else ''
-    
-    if not username:
-        errors.append('用户名不能为空')
-    elif len(username) < USERNAME_MIN_LEN or len(username) > USERNAME_MAX_LEN:
-        errors.append(f'用户名长度需在 {USERNAME_MIN_LEN}-{USERNAME_MAX_LEN} 个字符之间')
-    elif not USERNAME_REGEX.match(username):
-        errors.append('用户名只能包含字母、数字、下划线和中文')
-    
-    if not email:
-        errors.append('邮箱不能为空')
-    elif not EMAIL_REGEX.match(email):
-        errors.append('邮箱格式不正确')
-    
-    if not password:
-        errors.append('密码不能为空')
-    elif len(password) < PASSWORD_MIN_LEN:
-        errors.append(f'密码长度不能少于 {PASSWORD_MIN_LEN} 个字符')
-    
-    return errors
-
-
 @api_bp.route('/auth/register', methods=['POST'])
 def api_register():
     data = request.get_json(silent=True) or {}
     username = data.get('username', '').strip()
     email = data.get('email', '').strip()
     password = data.get('password', '')
-    
-    errors = _validate_registration(username, email, password)
+
+    errors = validate_registration(username, email, password)
     if errors:
         return _api_error('; '.join(errors))
     

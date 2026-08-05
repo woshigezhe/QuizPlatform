@@ -16,7 +16,7 @@ export const useQuizStore = defineStore('quiz', () => {
 
   const progress = computed(() => {
     if (totalQuestions.value === 0) return 0
-    return Math.round((currentIndex.value / totalQuestions.value) * 100)
+    return Math.round(((currentIndex.value + 1) / totalQuestions.value) * 100)
   })
 
   const isLast = computed(() => currentIndex.value >= totalQuestions.value - 1)

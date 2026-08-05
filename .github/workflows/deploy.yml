@@ -4,9 +4,48 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      skip_health_check:
+        description: 'Skip post-deploy health check'
+        type: boolean
+        default: false
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt --only-binary :all: -q
+          pip install gunicorn -q
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile app.py
+          python -m py_compile config.py
+          python -m py_compile models.py
+          python -m py_compile utils.py
+          python -m py_compile routes/shared.py
+          python -m py_compile routes/__init__.py
+          python -m py_compile routes/auth.py
+          python -m py_compile routes/quiz.py
+          python -m py_compile routes/admin.py
+          python -m py_compile routes/api/__init__.py
+          python -m py_compile routes/api/auth.py
+          python -m py_compile routes/api/quiz.py
+          python -m py_compile routes/api/admin.py
+
   deploy:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
@@ -18,4 +57,5 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             cd /opt/QuizPlatform
-            bash deploy.sh
+            HEALTH_FLAG=${{ inputs.skip_health_check == false && '--health-check' || '' }}
+            bash deploy.sh $HEALTH_FLAG

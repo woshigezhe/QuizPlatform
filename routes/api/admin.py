@@ -3,7 +3,7 @@
 """
 API 管理后台接口
 """
-from flask import Blueprint, request, jsonify, send_file
+from flask import request, jsonify, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -21,36 +21,17 @@ from models import db, User, Category, Group, Question, QuizRecord, QuizDetail, 
 from utils import admin_required
 from . import api_bp
 from .auth import _api_error, _api_success
+from ..shared import allowed_file as _allowed_file, handle_background_image_upload, handle_question_image_upload
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
 
 
-def _allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def _handle_bg_image():
+    return handle_background_image_upload(request.files)
 
 
-def _handle_background_image_upload():
-    file = request.files.get('background_image')
-    if file and file.filename and _allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        upload_dir = os.path.join('project', 'static', 'uploads', 'backgrounds')
-        os.makedirs(upload_dir, exist_ok=True)
-        filepath = os.path.join(upload_dir, filename)
-        file.save(filepath)
-        return os.path.join('static', 'uploads', 'backgrounds', filename).replace('\\', '/')
-    return None
-
-
-def _handle_question_image_upload():
-    file = request.files.get('question_image')
-    if file and file.filename and _allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        upload_dir = os.path.join('static', 'uploads', 'questions')
-        os.makedirs(upload_dir, exist_ok=True)
-        filepath = os.path.join(upload_dir, filename)
-        file.save(filepath)
-        return os.path.join('static', 'uploads', 'questions', filename).replace('\\', '/')
-    return None
+def _handle_q_image():
+    return handle_question_image_upload(request.files)
 
 
 # ==================== 分类管理 ====================
@@ -93,6 +74,21 @@ def api_admin_category_delete(id):
     cat = db.session.get(Category, id)
     if not cat:
         return _api_error('分类不存在', 404)
+    
+    # 清理关联数据：答题详情 → 答题记录 → 题目 → 分组 → 用户进度 → 分类
+    question_ids = [q.id for q in Question.query.filter_by(category_id=id).all()]
+    if question_ids:
+        QuizDetail.query.filter(QuizDetail.question_id.in_(question_ids)).delete(synchronize_session=False)
+    
+    record_ids = [r.id for r in QuizRecord.query.filter_by(category_id=id).all()]
+    if record_ids:
+        QuizDetail.query.filter(QuizDetail.record_id.in_(record_ids)).delete(synchronize_session=False)
+    
+    QuizRecord.query.filter_by(category_id=id).delete(synchronize_session=False)
+    Question.query.filter_by(category_id=id).delete(synchronize_session=False)
+    Group.query.filter_by(category_id=id).delete(synchronize_session=False)
+    UserProgress.query.filter_by(category_id=id).delete(synchronize_session=False)
+    
     db.session.delete(cat)
     db.session.commit()
     return _api_success(message='分类已删除')
@@ -130,7 +126,7 @@ def api_admin_group_add():
         background_image = data.get('background_image')
     else:
         data = request.form
-        background_image = _handle_background_image_upload()
+        background_image = _handle_bg_image()
     
     name = data.get('name', '').strip()
     if not name:
@@ -170,7 +166,7 @@ def api_admin_group_edit(id):
     group.study_content = data.get('study_content', group.study_content)
     group.unlock_order = int(data.get('unlock_order', group.unlock_order))
     
-    bg_image = _handle_background_image_upload()
+    bg_image = _handle_bg_image()
     if bg_image:
         group.background_image = bg_image
     
@@ -237,7 +233,7 @@ def api_admin_question_add():
         image = data.get('image')
     else:
         data = request.form
-        image = _handle_question_image_upload()
+        image = _handle_q_image()
     
     qtype = data.get('type', '').strip().lower()
     content = data.get('content', '').strip()
@@ -293,7 +289,7 @@ def api_admin_question_edit(id):
     q.analysis = data.get('analysis', q.analysis)
     q.difficulty = int(data.get('difficulty', q.difficulty))
     
-    image = _handle_question_image_upload()
+    image = _handle_q_image()
     if image:
         q.image = image
     
@@ -460,9 +456,15 @@ def api_admin_export():
     
     query = QuizRecord.query.join(User).join(Category)
     if start_date:
-        query = query.filter(QuizRecord.start_time >= datetime.strptime(start_date, '%Y-%m-%d'))
+        try:
+            query = query.filter(QuizRecord.start_time >= datetime.strptime(start_date, '%Y-%m-%d'))
+        except ValueError:
+            return _api_error('开始日期格式无效，请使用 YYYY-MM-DD 格式')
     if end_date:
-        query = query.filter(QuizRecord.start_time <= datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+        try:
+            query = query.filter(QuizRecord.start_time <= datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+        except ValueError:
+            return _api_error('结束日期格式无效，请使用 YYYY-MM-DD 格式')
     if category_id:
         query = query.filter(QuizRecord.category_id == category_id)
     if username:
