@@ -52,6 +52,33 @@ success() { echo -e "${GREEN}[✔]${NC} $1"; }
 warn()    { echo -e "${YELLOW}[!]${NC} $1"; }
 error()   { echo -e "${RED}[✘]${NC} $1"; exit 1; }
 
+# ==================== 镜像自动检测 ====================
+detect_pip_mirror() {
+    info "检测最优 pip 镜像源..."
+    if curl -s --connect-timeout 2 https://pypi.org > /dev/null 2>&1; then
+        PIP_INDEX=""
+        success "使用官方源 pypi.org"
+        return
+    fi
+    local mirrors=(
+        "https://pypi.tuna.tsinghua.edu.cn/simple|清华"
+        "https://mirrors.aliyun.com/pypi/simple|阿里云"
+        "https://pypi.mirrors.ustc.edu.cn/simple|中科大"
+    )
+    for entry in "${mirrors[@]}"; do
+        local url="${entry%%|*}"
+        local name="${entry##*|}"
+        local host=$(echo "$url" | awk -F/ '{print $3}')
+        if curl -s --connect-timeout 2 "https://${host}" > /dev/null 2>&1; then
+            PIP_INDEX="-i ${url}"
+            success "使用${name}镜像"
+            return
+        fi
+    done
+    warn "所有镜像均不可达，使用默认源"
+    PIP_INDEX=""
+}
+
 # ==================== 显示帮助 ====================
 show_help() {
     echo "QuizPlatform 生产部署脚本"
@@ -205,15 +232,17 @@ if [ "$DO_INSTALL" = true ]; then
     info "升级 pip..."
     python3 -m pip install --upgrade pip -q 2>/dev/null || true
 
+    detect_pip_mirror
+
     info "安装/更新项目依赖..."
-    pip install -r requirements.txt --only-binary :all: -q 2>/dev/null || \
-        pip install -r requirements.txt -q 2>/dev/null || \
+    pip install -r requirements.txt --only-binary :all: -q $PIP_INDEX 2>/dev/null || \
+        pip install -r requirements.txt -q $PIP_INDEX 2>/dev/null || \
         warn "部分依赖安装失败，继续部署..."
 
     # 确保 gunicorn 已安装
     if ! command -v gunicorn &> /dev/null; then
         info "安装 gunicorn..."
-        pip install gunicorn -q
+        pip install gunicorn -q $PIP_INDEX
     fi
 
     success "依赖安装完成"

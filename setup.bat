@@ -10,6 +10,60 @@ set "HOST=127.0.0.1"
 set "PORT=5000"
 set "PROJECT_DIR=%~dp0"
 
+:: ==================== 镜像自动检测 ====================
+:detect_mirror
+echo ※ 检测最优 pip 镜像源...
+
+:: 测试官方源
+curl -s --connect-timeout 2 https://pypi.org >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PIP_INDEX="
+    echo ✔ 使用官方源 pypi.org
+    goto :eof
+)
+
+:: 逐一尝试国内镜像
+curl -s --connect-timeout 2 https://pypi.tuna.tsinghua.edu.cn >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PIP_INDEX=-i https://pypi.tuna.tsinghua.edu.cn/simple"
+    echo ✔ 使用清华镜像
+    goto :eof
+)
+
+curl -s --connect-timeout 2 https://mirrors.aliyun.com >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PIP_INDEX=-i https://mirrors.aliyun.com/pypi/simple"
+    echo ✔ 使用阿里云镜像
+    goto :eof
+)
+
+curl -s --connect-timeout 2 https://pypi.mirrors.ustc.edu.cn >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PIP_INDEX=-i https://pypi.mirrors.ustc.edu.cn/simple"
+    echo ✔ 使用中科大镜像
+    goto :eof
+)
+
+echo ⚠ 所有镜像均不可达，使用默认源
+set "PIP_INDEX="
+goto :eof
+
+:detect_npm_mirror
+echo ※ 检测最优 npm 镜像源...
+curl -s --connect-timeout 2 https://registry.npmjs.org >nul 2>&1
+if %errorlevel% equ 0 (
+    set "NPM_REGISTRY=https://registry.npmjs.org"
+    goto :eof
+)
+curl -s --connect-timeout 2 https://registry.npmmirror.com >nul 2>&1
+if %errorlevel% equ 0 (
+    set "NPM_REGISTRY=https://registry.npmmirror.com"
+    echo ✔ 使用 npmmirror.com 镜像
+    goto :eof
+)
+set "NPM_REGISTRY=https://registry.npmjs.org"
+goto :eof
+
 :: ==================== 检查 Python 环境 ====================
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
@@ -86,22 +140,20 @@ echo ============================================
 echo  [1] 安装 Python 依赖包
 echo ============================================
 
+call :detect_mirror
+
 echo ※ 升级 pip...
-python -m pip install --upgrade pip -q
+python -m pip install --upgrade pip -q %PIP_INDEX%
 
 echo ※ 安装项目依赖...
-pip install -r requirements.txt --only-binary :all: -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -r requirements.txt --only-binary :all: %PIP_INDEX%
 if %errorlevel% neq 0 (
-    echo [!] 清华源失败，尝试默认源...
-    pip install -r requirements.txt --only-binary :all:
+    echo [!] 仅二进制安装失败，尝试完整安装...
+    pip install -r requirements.txt %PIP_INDEX%
     if %errorlevel% neq 0 (
-        echo [!] 仅二进制安装失败，尝试完整安装（需要 C++ 编译器）...
-        pip install -r requirements.txt
-        if %errorlevel% neq 0 (
-            echo [错误] 依赖安装失败，请检查网络连接
-            pause
-            goto main_menu
-        )
+        echo [错误] 依赖安装失败，请检查网络连接
+        pause
+        goto main_menu
     )
 )
 
@@ -292,10 +344,12 @@ echo ============================================
 echo  [8] 一键启动（安装依赖 + 初始化 + 开发服务器）
 echo ============================================
 
+call :detect_mirror
+
 echo ※ [1/3] 安装依赖...
-pip install -r requirements.txt --only-binary :all: -q -i https://pypi.tuna.tsinghua.edu.cn/simple 2>nul
+pip install -r requirements.txt --only-binary :all: -q %PIP_INDEX% 2>nul
 if %errorlevel% neq 0 (
-    pip install -r requirements.txt --only-binary :all: -q
+    pip install -r requirements.txt -q %PIP_INDEX%
 )
 echo   依赖安装完成
 
@@ -331,9 +385,10 @@ if not exist "frontend\node_modules" (
         pause
         goto main_menu
     )
+    call :detect_npm_mirror
     echo ※ 安装前端依赖 (npm install)...
     cd frontend
-    call npm install
+    call npm install --registry="%NPM_REGISTRY%"
     cd ..
     if %errorlevel% neq 0 (
         echo [错误] 前端依赖安装失败

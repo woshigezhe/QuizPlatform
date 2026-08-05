@@ -28,6 +28,61 @@ warn()    { echo -e "${YELLOW}⚠${NC} $1"; }
 error()   { echo -e "${RED}[错误]${NC} $1"; }
 header()  { echo -e "${BOLD}$1${NC}"; }
 
+# ==================== 镜像自动检测 ====================
+detect_pip_mirror() {
+    info "检测最优 pip 镜像源..."
+
+    # 测试官方源是否可达
+    if curl -s --connect-timeout 2 https://pypi.org > /dev/null 2>&1; then
+        PIP_MIRROR="https://pypi.org/simple"
+        PIP_INDEX=""
+        success "使用官方源 pypi.org"
+        return
+    fi
+
+    # 国内镜像列表（按优先级排列）
+    local mirrors=(
+        "https://pypi.tuna.tsinghua.edu.cn/simple|清华"
+        "https://mirrors.aliyun.com/pypi/simple|阿里云"
+        "https://pypi.mirrors.ustc.edu.cn/simple|中科大"
+        "https://mirrors.cloud.tencent.com/pypi/simple|腾讯云"
+    )
+
+    for entry in "${mirrors[@]}"; do
+        local url="${entry%%|*}"
+        local name="${entry##*|}"
+        local host=$(echo "$url" | awk -F/ '{print $3}')
+
+        if curl -s --connect-timeout 2 "https://${host}" > /dev/null 2>&1; then
+            PIP_MIRROR="$url"
+            PIP_INDEX="-i ${url}"
+            success "使用${name}镜像"
+            return
+        fi
+    done
+
+    warn "所有镜像均不可达，使用默认源"
+    PIP_MIRROR="https://pypi.org/simple"
+    PIP_INDEX=""
+}
+
+detect_npm_mirror() {
+    info "检测最优 npm 镜像源..."
+
+    if curl -s --connect-timeout 2 https://registry.npmjs.org > /dev/null 2>&1; then
+        NPM_REGISTRY="https://registry.npmjs.org"
+        return
+    fi
+
+    if curl -s --connect-timeout 2 https://registry.npmmirror.com > /dev/null 2>&1; then
+        NPM_REGISTRY="https://registry.npmmirror.com"
+        success "使用 npmmirror.com 镜像"
+        return
+    fi
+
+    NPM_REGISTRY="https://registry.npmjs.org"
+}
+
 # ==================== 检查 Python 环境 ====================
 check_python() {
     if ! command -v python3 &> /dev/null; then
@@ -109,23 +164,20 @@ install_deps() {
     header "[1] 安装 Python 依赖包"
     echo "============================================"
 
-    info "升级 pip..."
-    python3 -m pip install --upgrade pip -q
+    detect_pip_mirror
 
-    info "安装项目依赖 (清华源)..."
-    if pip install -r requirements.txt --only-binary :all: -i https://pypi.tuna.tsinghua.edu.cn/simple 2>/dev/null; then
+    info "升级 pip..."
+    python3 -m pip install --upgrade pip -q $PIP_INDEX
+
+    info "安装项目依赖..."
+    if pip install -r requirements.txt --only-binary :all: $PIP_INDEX 2>/dev/null; then
         success "依赖安装完成"
     else
-        warn "清华源失败，尝试默认源..."
-        if pip install -r requirements.txt --only-binary :all: 2>/dev/null; then
+        warn "仅二进制安装失败，尝试完整安装..."
+        if pip install -r requirements.txt $PIP_INDEX; then
             success "依赖安装完成"
         else
-            warn "仅二进制安装失败，尝试完整安装..."
-            if pip install -r requirements.txt; then
-                success "依赖安装完成"
-            else
-                error "依赖安装失败，请检查网络连接"
-            fi
+            error "依赖安装失败，请检查网络连接"
         fi
     fi
 
@@ -337,10 +389,12 @@ one_click() {
     header "[8] 一键启动（安装依赖 + 初始化 + 开发服务器）"
     echo "============================================"
 
+    detect_pip_mirror
+
     echo ""
     info "[1/3] 安装依赖..."
-    pip install -r requirements.txt --only-binary :all: -q -i https://pypi.tuna.tsinghua.edu.cn/simple 2>/dev/null || \
-        pip install -r requirements.txt --only-binary :all: -q
+    pip install -r requirements.txt --only-binary :all: -q $PIP_INDEX 2>/dev/null || \
+        pip install -r requirements.txt -q $PIP_INDEX
     success "依赖安装完成"
 
     echo ""
@@ -379,8 +433,9 @@ frontend_dev() {
             main_menu
             return
         fi
+        detect_npm_mirror
         info "首次运行，安装前端依赖 (npm install)..."
-        (cd frontend && npm install) || {
+        (cd frontend && npm install --registry="${NPM_REGISTRY}") || {
             error "前端依赖安装失败"
             read -p "按 Enter 返回主菜单..." _
             main_menu
