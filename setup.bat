@@ -321,6 +321,12 @@ echo.
 echo --- 项目路径 ---
 echo %PROJECT_DIR%
 echo.
+echo --- 环境变量 ---
+if defined ENV (echo   ENV = %ENV%) else (echo   ENV = 未设置)
+if defined FLASK_DEBUG (echo   FLASK_DEBUG = %FLASK_DEBUG%) else (echo   FLASK_DEBUG = 未设置)
+if defined DATABASE_URL (echo   DATABASE_URL = %DATABASE_URL%) else (echo   DATABASE_URL = 未设置)
+if defined DB_PATH (echo   DB_PATH = %DB_PATH%) else (echo   DB_PATH = 未设置)
+echo.
 pause
 goto main_menu
 

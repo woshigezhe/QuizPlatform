@@ -11,6 +11,7 @@
 #   --no-pull         跳过代码拉取
 #   --no-install      跳过依赖安装
 #   --db-url URL      设置 DATABASE_URL 环境变量
+#   --db-path PATH    设置 DB_PATH 环境变量 (指定 SQLite 数据库文件路径)
 #   --env-file FILE   加载环境变量文件
 #   --health-check    部署后执行健康检查
 #   --log-dir DIR     日志目录 (默认: 项目目录)
@@ -110,6 +111,7 @@ show_help() {
     echo "  --no-pull         跳过代码拉取"
     echo "  --no-install      跳过依赖安装"
     echo "  --db-url URL      设置 DATABASE_URL 环境变量"
+    echo "  --db-path PATH    设置 DB_PATH 环境变量 (SQLite 文件路径)"
     echo "  --env-file FILE   加载环境变量文件"
     echo "  --help            显示此帮助信息"
     echo ""
@@ -158,6 +160,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --db-url)
             export DATABASE_URL="$2"
+            shift 2
+            ;;
+        --db-path)
+            export DB_PATH="$2"
             shift 2
             ;;
         --env-file)
@@ -304,6 +310,8 @@ with app.app_context():
 source ${VENV_DIR}/bin/activate
 export ENV=production
 export FLASK_DEBUG=0
+export DATABASE_URL=\"${DATABASE_URL:-}\"
+export DB_PATH=\"${DB_PATH:-}\"
 gunicorn -w ${WORKERS} -b ${HOST}:${PORT} app:app \
     --access-logfile ${_access_log} \
     --error-logfile ${_error_log} \

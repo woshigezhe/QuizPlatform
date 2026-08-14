@@ -350,6 +350,7 @@ show_info() {
     echo "  ENV              = ${ENV:-未设置}"
     echo "  FLASK_DEBUG      = ${FLASK_DEBUG:-未设置}"
     echo "  DATABASE_URL     = ${DATABASE_URL:-未设置}"
+    echo "  DB_PATH          = ${DB_PATH:-未设置}"
     echo "  CONFIG_DATABASE_URL = ${CONFIG_DATABASE_URL:-未设置}"
     echo "  USERS_DATABASE_URL  = ${USERS_DATABASE_URL:-未设置}"
     echo "  RECORDS_DATABASE_URL = ${RECORDS_DATABASE_URL:-未设置}"

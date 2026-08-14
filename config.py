@@ -77,15 +77,28 @@ ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
 
 # ==================== 数据库 URI 构建 ====================
 def _build_sqlite_uri(db_file):
-    """构建 SQLite 数据库 URI"""
-    db_path = os.path.join(BASEDIR, 'instance', db_file)
+    """构建 SQLite 数据库 URI
+
+    支持绝对路径、相对路径（相对于项目根目录）。
+    """
+    if os.path.isabs(db_file):
+        db_path = db_file
+    elif db_file.startswith('instance/') or db_file.startswith('instance\\'):
+        db_path = os.path.join(BASEDIR, db_file)
+    else:
+        db_path = os.path.join(BASEDIR, 'instance', db_file)
     return f'sqlite:///{db_path.replace(os.sep, "/")}'
 
 # 环境自适应：开发环境默认 SQLite，生产环境可指定 MySQL/PostgreSQL
 _database_url = os.environ.get('DATABASE_URL', '').strip()
+# 自定义 SQLite 数据库路径（如 E:/data/quiz.db），所有环境均可用
+_db_path = os.environ.get('DB_PATH', '').strip()
 
 if _database_url:
     SQLALCHEMY_DATABASE_URI = _database_url
+elif _db_path:
+    # 优先使用指定路径的 SQLite 数据库
+    SQLALCHEMY_DATABASE_URI = _build_sqlite_uri(_db_path)
 elif IS_PRODUCTION:
     # 生产环境未设置 DATABASE_URL 时，尝试从单独的环境变量构建
     db_host = os.environ.get('DB_HOST', '').strip()
@@ -147,6 +160,14 @@ class Config:
     def init_app(app):
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
         os.makedirs('instance', exist_ok=True)
+        # 自定义 DB_PATH 时，确保其父目录存在
+        if _db_path and SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+            _db_parent = os.path.dirname(
+                os.path.abspath(_db_path) if os.path.isabs(_db_path)
+                else os.path.join(BASEDIR, _db_path)
+            )
+            if _db_parent:
+                os.makedirs(_db_parent, exist_ok=True)
 
 
 # ==================== 打印当前环境信息（方便调试） ====================
@@ -159,5 +180,7 @@ def print_env_info():
 
     print(f"  环境: {'🔧 生产环境' if IS_PRODUCTION else '💻 开发环境'}")
     print(f"  数据库: {db_info}")
+    if _db_path and not _database_url:
+        print(f"  数据库路径: {_db_path}")
     if IS_PRODUCTION:
         print(f"  数据分离: {'是' if (_config_url or _users_url or _records_url) else '否（共用同一数据库）'}")

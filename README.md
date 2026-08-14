@@ -181,6 +181,22 @@ python app.py
 - SECRET_KEY：使用默认值
 - 管理员密码：`admin123`
 
+#### 指定数据库文件路径（可选）
+
+开发/生产环境均可通过 `DB_PATH` 环境变量直接读取指定路径的 SQLite 数据库：
+
+```bash
+# Windows
+set DB_PATH=D:\data\quiz.db
+python app.py
+
+# Linux/macOS
+export DB_PATH=/data/quiz.db
+python app.py
+```
+
+支持绝对路径或相对路径（相对于项目根目录），父目录不存在时自动创建。
+
 ### 生产环境
 
 ```bash
