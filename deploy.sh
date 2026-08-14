@@ -4,7 +4,7 @@
 #
 # 选项:
 #   --workers NUM     工作进程数 (默认 4)
-#   --port PORT       监听端口 (默认 5000)
+#   --port PORT       监听端口 (默认 8000)
 #   --host HOST       监听地址 (默认 0.0.0.0)
 #   --restart         仅重启服务 (不拉取代码, 不装依赖)
 #   --pull-only       仅拉取最新代码
@@ -32,7 +32,7 @@ SCREEN_NAME="quizplatform"
 VENV_DIR=".venv"
 WORKERS=4
 HOST="0.0.0.0"
-PORT=5000
+PORT=8000
 DO_PULL=true
 DO_INSTALL=true
 DO_RESTART=true
@@ -103,7 +103,7 @@ show_help() {
     echo ""
     echo "选项:"
     echo "  --workers NUM     工作进程数 (默认 4)"
-    echo "  --port PORT       监听端口 (默认 5000)"
+    echo "  --port PORT       监听端口 (默认 8000)"
     echo "  --host HOST       监听地址 (默认 0.0.0.0)"
     echo "  --restart         仅重启服务 (不拉取代码, 不装依赖)"
     echo "  --pull-only       仅拉取最新代码"

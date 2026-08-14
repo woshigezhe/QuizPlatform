@@ -53,10 +53,10 @@ if __name__ == '__main__':
     from config import print_env_info, ADMIN_USERNAME, ADMIN_PASSWORD
     print_env_info()
     print()
-    print(f"服务器运行在 http://127.0.0.1:5000")
+    print(f"服务器运行在 http://127.0.0.1:8000")
     print(f"默认管理员：{ADMIN_USERNAME} / {ADMIN_PASSWORD}")
     
     if debug_mode:
         print("⚠️  DEBUG 模式已开启，仅限开发环境使用！")
     
-    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+    app.run(debug=debug_mode, host='0.0.0.0', port=8000)

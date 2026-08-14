@@ -121,7 +121,7 @@ pip install -r requirements.txt --only-binary :all:
 python app.py
 ```
 
-访问 **http://127.0.0.1:5000**
+访问 **http://127.0.0.1:8000**
 
 ### 默认管理员
 
@@ -204,7 +204,7 @@ python app.py
 export ENV=production
 
 # 方式二：通过 gunicorn 启动自动识别
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+gunicorn -w 4 -b 0.0.0.0:8000 app:app
 ```
 
 #### 生产环境数据库配置

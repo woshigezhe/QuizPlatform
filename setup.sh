@@ -10,7 +10,7 @@ shopt -s nocasematch
 VENV_DIR=".venv"
 APP_FILE="app.py"
 HOST="127.0.0.1"
-PORT="5000"
+PORT="8000"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ==================== 颜色输出 ====================
@@ -446,7 +446,7 @@ frontend_dev() {
     fi
 
     info "前端地址: http://localhost:3000"
-    info "API 代理目标: http://127.0.0.1:5000"
+    info "API 代理目标: http://127.0.0.1:8000"
     info "请确保 Flask 后端已启动"
     info "按 Ctrl+C 停止服务器"
     echo "============================================"

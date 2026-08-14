@@ -7,7 +7,7 @@ setlocal enabledelayedexpansion
 set "VENV_DIR=.venv"
 set "APP_FILE=app.py"
 set "HOST=127.0.0.1"
-set "PORT=5000"
+set "PORT=8000"
 set "PROJECT_DIR=%~dp0"
 
 :: ==================== 镜像自动检测 ====================
@@ -405,7 +405,7 @@ if not exist "frontend\node_modules" (
     )
 )
 echo ※ 前端地址: http://localhost:3000
-echo ※ API 代理目标: http://127.0.0.1:5000
+echo ※ API 代理目标: http://127.0.0.1:8000
 echo ※ 请确保 Flask 后端已启动
 echo ※ 按 Ctrl+C 停止服务器
 echo ============================================
