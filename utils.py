@@ -41,34 +41,45 @@ def check_answer(question, user_answer):
     return False
 
 def init_db():
-    """创建数据库和默认管理员"""
+    """创建数据库和默认管理员（支持多 bind 分离）"""
+    # 为主数据库和每个 bind 分别创建表
     db.create_all()
+    for bind_key in ('config', 'users', 'records'):
+        try:
+            db.create_all(bind_key=bind_key)
+        except Exception as e:
+            print(f"注意：bind '{bind_key}' 表创建跳过（{e}）")
     
     # 迁移：为 Group 表添加新字段（如果不存在）
+    # 优先使用 config bind engine，回退到默认 engine（兼容旧版无 bind 配置的情况）
     from sqlalchemy import text, inspect
-    inspector = inspect(db.engine)
-    if 'group' in inspector.get_table_names():
-        columns = [col['name'] for col in inspector.get_columns('group')]
+    try:
+        _migrate_engine = db.get_engine(bind_key='config')
+    except Exception:
+        _migrate_engine = db.engine
+    _inspector = inspect(_migrate_engine)
+    if 'group' in _inspector.get_table_names():
+        columns = [col['name'] for col in _inspector.get_columns('group')]
         if 'study_content' not in columns:
-            with db.engine.connect() as conn:
+            with _migrate_engine.connect() as conn:
                 conn.execute(text("ALTER TABLE [group] ADD COLUMN study_content TEXT"))
                 conn.commit()
             print("已添加 group.study_content 列")
         if 'unlock_order' not in columns:
-            with db.engine.connect() as conn:
+            with _migrate_engine.connect() as conn:
                 conn.execute(text("ALTER TABLE [group] ADD COLUMN unlock_order INTEGER DEFAULT 0"))
                 conn.commit()
             print("已添加 group.unlock_order 列")
         if 'background_image' not in columns:
-            with db.engine.connect() as conn:
+            with _migrate_engine.connect() as conn:
                 conn.execute(text("ALTER TABLE [group] ADD COLUMN background_image VARCHAR(255)"))
                 conn.commit()
             print("已添加 group.background_image 列")
     
-    if 'question' in inspector.get_table_names():
-        columns = [col['name'] for col in inspector.get_columns('question')]
+    if 'question' in _inspector.get_table_names():
+        columns = [col['name'] for col in _inspector.get_columns('question')]
         if 'image' not in columns:
-            with db.engine.connect() as conn:
+            with _migrate_engine.connect() as conn:
                 conn.execute(text("ALTER TABLE question ADD COLUMN image VARCHAR(255)"))
                 conn.commit()
             print("已添加 question.image 列")

@@ -107,6 +107,11 @@ onMounted(() => {
   }
 })
 
+watch(() => quiz.recordId, () => {
+  answer.value = ''
+  multiAnswer.value = []
+})
+
 watch(() => quiz.currentIndex, () => {
   if (quiz.savedAnswer) {
     if (quiz.currentQuestion?.type === 'multiple') {

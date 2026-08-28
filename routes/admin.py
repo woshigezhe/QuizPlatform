@@ -19,28 +19,17 @@ import zipfile
 import shutil
 from models import db, User, Category, Group, Question, QuizRecord, QuizDetail, UserProgress
 from utils import admin_required
+from .shared import handle_background_image_upload, handle_question_image_upload
 
 admin_bp = Blueprint('admin', __name__)
 
-TEMPLATES_DIR = 'templates'
-ADMIN_TEMPLATES_DIR = os.path.join(TEMPLATES_DIR, 'admin')
-
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
 
-def _allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 def _handle_background_image_upload():
-    """处理背景图片上传，返回保存的文件路径"""
-    file = request.files.get('background_image')
-    if file and file.filename and _allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        upload_dir = os.path.join('project', 'static', 'uploads', 'backgrounds')
-        os.makedirs(upload_dir, exist_ok=True)
-        filepath = os.path.join(upload_dir, filename)
-        file.save(filepath)
-        return os.path.join('static', 'uploads', 'backgrounds', filename).replace('\\', '/')
-    return None
+    return handle_background_image_upload(request.files)
+
+def _handle_question_image_upload():
+    return handle_question_image_upload(request.files)
 
 @admin_bp.route('/')
 @login_required
@@ -73,6 +62,21 @@ def admin_category_add():
 @admin_required
 def admin_category_delete(id):
     cat = db.get_or_404(Category, id)
+    
+    # 清理关联数据
+    question_ids = [q.id for q in Question.query.filter_by(category_id=id).all()]
+    if question_ids:
+        QuizDetail.query.filter(QuizDetail.question_id.in_(question_ids)).delete(synchronize_session=False)
+    
+    record_ids = [r.id for r in QuizRecord.query.filter_by(category_id=id).all()]
+    if record_ids:
+        QuizDetail.query.filter(QuizDetail.record_id.in_(record_ids)).delete(synchronize_session=False)
+    
+    QuizRecord.query.filter_by(category_id=id).delete(synchronize_session=False)
+    Question.query.filter_by(category_id=id).delete(synchronize_session=False)
+    Group.query.filter_by(category_id=id).delete(synchronize_session=False)
+    UserProgress.query.filter_by(category_id=id).delete(synchronize_session=False)
+    
     db.session.delete(cat)
     db.session.commit()
     flash('分类已删除')
@@ -165,18 +169,6 @@ def admin_questions():
                            categories=categories, groups=groups,
                            filters={'category_id': category_id, 'group_id': group_id})
 
-def _handle_question_image_upload():
-    """处理题目配图上传，返回保存的文件路径"""
-    file = request.files.get('question_image')
-    if file and file.filename and _allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        upload_dir = os.path.join('static', 'uploads', 'questions')
-        os.makedirs(upload_dir, exist_ok=True)
-        filepath = os.path.join(upload_dir, filename)
-        file.save(filepath)
-        return os.path.join('static', 'uploads', 'questions', filename).replace('\\', '/')
-    return None
-
 @admin_bp.route('/question/add', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -262,7 +254,7 @@ def admin_questions_bulk_delete():
 @admin_required
 def admin_download_import_prompt():
     """下载 AI 数据转换提示词文件"""
-    prompt_path = os.path.join('static', 'import_prompt.txt')
+    prompt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static', 'import_prompt.txt')
     return send_file(prompt_path, download_name='import_prompt.txt', as_attachment=True)
 
 # ==================== 批量导入 ====================
@@ -418,9 +410,17 @@ def admin_export():
 
     query = QuizRecord.query.join(User).join(Category)
     if start_date:
-        query = query.filter(QuizRecord.start_time >= datetime.strptime(start_date, '%Y-%m-%d'))
+        try:
+            query = query.filter(QuizRecord.start_time >= datetime.strptime(start_date, '%Y-%m-%d'))
+        except ValueError:
+            flash('开始日期格式无效，请使用 YYYY-MM-DD 格式')
+            return redirect(url_for('admin.admin_export_page'))
     if end_date:
-        query = query.filter(QuizRecord.start_time <= datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+        try:
+            query = query.filter(QuizRecord.start_time <= datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+        except ValueError:
+            flash('结束日期格式无效，请使用 YYYY-MM-DD 格式')
+            return redirect(url_for('admin.admin_export_page'))
     if category_id:
         query = query.filter(QuizRecord.category_id == category_id)
     if username:
@@ -434,7 +434,7 @@ def admin_export():
             '用户名': rec.user.username,
             '开始时间': rec.start_time.strftime('%Y-%m-%d %H:%M:%S') if rec.start_time else '',
             '结束时间': rec.end_time.strftime('%Y-%m-%d %H:%M:%S') if rec.end_time else '',
-            '分类': rec.category.name,
+            '分类': rec.category.name if rec.category else '',
             '得分': rec.score,
             '正确题数': rec.correct_count,
             '总题数': rec.total_questions,
@@ -487,9 +487,17 @@ def admin_history():
     if category_id:
         query = query.filter(QuizRecord.category_id == category_id)
     if start_date:
-        query = query.filter(QuizRecord.start_time >= datetime.strptime(start_date, '%Y-%m-%d'))
+        try:
+            query = query.filter(QuizRecord.start_time >= datetime.strptime(start_date, '%Y-%m-%d'))
+        except ValueError:
+            flash('开始日期格式无效')
+            return redirect(url_for('admin.admin_history'))
     if end_date:
-        query = query.filter(QuizRecord.start_time <= datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+        try:
+            query = query.filter(QuizRecord.start_time <= datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1))
+        except ValueError:
+            flash('结束日期格式无效')
+            return redirect(url_for('admin.admin_history'))
     
     records = query.order_by(QuizRecord.start_time.desc()).limit(500).all()
     categories = Category.query.all()

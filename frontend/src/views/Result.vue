@@ -49,10 +49,21 @@ const allCorrect = ref(undefined)
 
 onMounted(async () => {
   const recId = route.params.recordId
+  
+  // 保存提交时返回的题组信息（在 fetchResult 覆盖前暂存）
+  const savedAllCorrect = quiz.result?.all_correct
+  const savedGroupName = quiz.result?.group_name
+  
   if (recId) {
     loading.value = true
     await quiz.fetchResult(parseInt(recId))
     loading.value = false
+    
+    // 恢复题组信息到 result 中
+    if (savedAllCorrect !== undefined && quiz.result) {
+      quiz.result.all_correct = savedAllCorrect
+      quiz.result.group_name = savedGroupName
+    }
   }
   allCorrect.value = quiz.result?.all_correct
 })
