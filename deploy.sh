@@ -289,15 +289,26 @@ fi
 if [ "$DO_RESTART" = true ]; then
     echo "━━━ [3/3] 重启服务 ━━━"
 
-    # 停止旧进程
+    # 停止旧进程（screen 会话 + 直接清理 gunicorn，确保端口释放）
     if screen -list 2>/dev/null | grep -q "\.${SCREEN_NAME}"; then
         info "停止旧 screen 会话..."
-        screen -S "$SCREEN_NAME" -X quit
-        sleep 1
-        success "旧会话已关闭"
-    else
-        info "没有运行中的服务"
+        screen -S "$SCREEN_NAME" -X quit 2>/dev/null || true
     fi
+    if pgrep -f 'gunicorn.*app:app' >/dev/null 2>&1; then
+        info "清理残留 gunicorn 进程..."
+        pkill -f 'gunicorn.*app:app' 2>/dev/null || true
+        sleep 2
+        pkill -9 -f 'gunicorn.*app:app' 2>/dev/null || true
+        sleep 1
+    fi
+    # 等待端口释放
+    for _i in $(seq 1 10); do
+        if ! command -v ss >/dev/null 2>&1 || ! ss -ltn 2>/dev/null | grep -q ":${PORT} "; then
+            break
+        fi
+        sleep 1
+    done
+    success "旧进程已停止"
 
     # 初始化数据库（如果需要）
     info "检查/初始化数据库..."
@@ -348,7 +359,7 @@ exec ${PYBIN} -m gunicorn -w ${WORKERS} -b ${HOST}:${PORT} app:app \
         # 健康检查
         if [ "$HEALTH_CHECK" = true ]; then
             echo "━━━ 健康检查 ━━━"
-            _check_url="http://localhost:${PORT}/"
+            _check_url="http://localhost:${PORT}/api/categories"
             if command -v curl &> /dev/null; then
                 _http_code=$(curl -s -o /dev/null -w '%{http_code}' "$_check_url" 2>/dev/null || echo "000")
                 if [ "$_http_code" -ge 200 ] && [ "$_http_code" -lt 500 ]; then
