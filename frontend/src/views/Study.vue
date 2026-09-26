@@ -8,8 +8,8 @@
       </div>
       <h2 class="text-center mb-3">{{ studyData.group.name }}</h2>
       <p v-if="studyData.group.description" class="text-center text-muted">{{ studyData.group.description }}</p>
-      <el-card v-if="studyData.group.study_content" shadow="never" class="study-card">
-        <div class="study-content" v-html="studyData.group.study_content"></div>
+      <el-card v-if="renderedContent" shadow="never" class="study-card">
+        <div class="study-content" v-html="renderedContent"></div>
       </el-card>
       <el-empty v-else description="该题组暂未添加学习资料" />
       <div class="text-center mt-3">
@@ -21,16 +21,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuizStore } from '@/stores/quiz'
 import { getStudy } from '@/api/quiz'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const route = useRoute()
 const router = useRouter()
 const quiz = useQuizStore()
 const studyData = ref(null)
 const loading = ref(false)
+
+// 渲染学习资料（Markdown/HTML），并用 DOMPurify 净化，防止 XSS
+const renderedContent = computed(() => {
+  const raw = studyData.value?.group?.study_content || ''
+  if (!raw) return ''
+  return DOMPurify.sanitize(marked.parse(raw))
+})
 
 onMounted(async () => {
   loading.value = true

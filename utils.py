@@ -4,7 +4,7 @@
 辅助函数
 """
 from functools import wraps
-from flask import flash, redirect, url_for
+from flask import flash, redirect, url_for, request, jsonify
 from flask_login import current_user
 from models import db, User
 from config import ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL
@@ -14,7 +14,13 @@ from werkzeug.security import generate_password_hash
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != 'admin':
+        if not current_user.is_authenticated:
+            if request.path.startswith('/api/'):
+                return jsonify({'success': False, 'message': '请先登录'}), 401
+            return redirect(url_for('auth.auth_login', next=request.url))
+        if current_user.role != 'admin':
+            if request.path.startswith('/api/'):
+                return jsonify({'success': False, 'message': '权限不足'}), 403
             flash('需要管理员权限')
             return redirect(url_for('quiz.index'))
         return f(*args, **kwargs)
@@ -23,6 +29,8 @@ def admin_required(f):
 # ==================== 业务逻辑 ====================
 def check_answer(question, user_answer):
     """根据题型判断答案是否正确"""
+    if question is None:
+        return False
     if question.type == 'single':
         return user_answer == question.answer
     elif question.type == 'multiple':

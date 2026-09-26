@@ -5,6 +5,7 @@
 """
 import re
 import os
+import zipfile
 from werkzeug.utils import secure_filename
 
 USERNAME_MIN_LEN = 3
@@ -68,3 +69,25 @@ def handle_question_image_upload(request_files):
         file.save(filepath)
         return os.path.join('static', 'uploads', 'questions', filename).replace('\\', '/')
     return None
+
+
+def safe_extract_zip(zf, dest_dir):
+    """安全解压 zip，防止 Zip Slip 路径穿越。
+
+    逐条校验成员路径必须落在 dest_dir 内，否则抛出 ValueError。
+    返回成功写出的文件数。
+    """
+    dest_abs = os.path.realpath(dest_dir)
+    count = 0
+    for member in zf.infolist():
+        name = member.filename
+        if not name or name.endswith('/'):
+            continue
+        target = os.path.realpath(os.path.join(dest_abs, name))
+        if target != dest_abs and not target.startswith(dest_abs + os.sep):
+            raise ValueError(f'压缩包包含非法路径，已拒绝解压: {name}')
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with zf.open(member) as src, open(target, 'wb') as dst:
+            dst.write(src.read())
+        count += 1
+    return count

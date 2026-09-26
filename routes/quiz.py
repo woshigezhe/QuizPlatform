@@ -323,14 +323,14 @@ def submit_quiz():
 
     total_score = 0
     correct_count = 0
-    for qid, user_answer in session['answers'].items():
+    for qid, user_answer in session.get('answers', {}).items():
         question = db.session.get(Question, int(qid))
         correct = check_answer(question, user_answer)
         score_earned = 1 if correct else 0
         total_score += score_earned
         if correct:
             correct_count += 1
-        detail = QuizDetail(record_id=record_id, question_id=qid,
+        detail = QuizDetail(record_id=record_id, question_id=int(qid),
                             user_answer=user_answer, is_correct=correct,
                             score_earned=score_earned)
         db.session.add(detail)

@@ -272,6 +272,8 @@ def api_answer():
         session['current_index'] = current_index + 1
         next_qid = question_ids[current_index + 1]
         next_q = db.session.get(Question, next_qid)
+        if not next_q:
+            return _session_api_error('题目不存在')
         saved = session.get('answers', {}).get(str(next_qid))
         return _api_success(data={
             'question': _question_to_dict(next_q),
@@ -283,6 +285,8 @@ def api_answer():
         session['current_index'] = current_index - 1
         prev_qid = question_ids[current_index - 1]
         prev_q = db.session.get(Question, prev_qid)
+        if not prev_q:
+            return _session_api_error('题目不存在')
         saved = session.get('answers', {}).get(str(prev_qid))
         return _api_success(data={
             'question': _question_to_dict(prev_q),
@@ -316,7 +320,7 @@ def _submit_normal_internal():
             correct_count += 1
         detail = QuizDetail(
             record_id=record_id,
-            question_id=qid,
+            question_id=int(qid),
             user_answer=user_answer,
             is_correct=correct,
             score_earned=score_earned

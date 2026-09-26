@@ -19,7 +19,7 @@ import zipfile
 import shutil
 from models import db, User, Category, Group, Question, QuizRecord, QuizDetail, UserProgress
 from utils import admin_required
-from .shared import handle_background_image_upload, handle_question_image_upload
+from .shared import handle_background_image_upload, handle_question_image_upload, safe_extract_zip
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -226,6 +226,8 @@ def admin_question_edit(id):
 @admin_required
 def admin_question_delete(id):
     q = db.get_or_404(Question, id)
+    # 先清理关联的答题详情，避免产生孤儿数据
+    QuizDetail.query.filter(QuizDetail.question_id == id).delete(synchronize_session=False)
     db.session.delete(q)
     db.session.commit()
     flash('题目已删除')
@@ -289,7 +291,7 @@ def admin_import():
                 os.makedirs(temp_dir, exist_ok=True)
                 
                 with zipfile.ZipFile(filepath, 'r') as zf:
-                    zf.extractall(temp_dir)
+                    safe_extract_zip(zf, temp_dir)
                 
                 # 查找 Excel/CSV 文件和图片
                 for root, _, files in os.walk(temp_dir):
@@ -451,9 +453,9 @@ def admin_export():
                 details_data.append({
                     '记录 ID': rec.id,
                     '用户名': rec.user.username,
-                    '题目': det.question.content,
+                    '题目': det.question.content if det.question else '',
                     '用户答案': det.user_answer,
-                    '正确答案': det.question.answer,
+                    '正确答案': det.question.answer if det.question else '',
                     '是否正确': det.is_correct,
                     '得分': det.score_earned
                 })

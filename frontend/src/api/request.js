@@ -20,14 +20,15 @@ request.interceptors.response.use(
   (error) => {
     if (error.response) {
       const status = error.response.status
+      const serverMsg = error.response.data?.message
       if (status === 401) {
-        ElMessage.error('请先登录')
+        ElMessage.error(serverMsg || '请先登录')
       } else if (status === 403) {
-        ElMessage.error('权限不足')
+        ElMessage.error(serverMsg || '权限不足')
       } else if (status === 404) {
-        ElMessage.error('资源不存在')
+        ElMessage.error(serverMsg || '资源不存在')
       } else {
-        ElMessage.error(error.response.data?.message || '服务器错误')
+        ElMessage.error(serverMsg || '服务器错误')
       }
     } else {
       ElMessage.error('网络错误，请检查连接')

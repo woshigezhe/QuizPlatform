@@ -3,7 +3,7 @@
 """
 在线答题系统 - 主入口
 """
-from flask import Flask
+from flask import Flask, request, jsonify, redirect, url_for
 from flask_login import LoginManager
 from config import Config
 from models import db
@@ -21,9 +21,27 @@ db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.auth_login'
 
+
+@login_manager.unauthorized_handler
+def unauthorized_handler():
+    """API 请求返回 401 JSON，页面请求重定向到登录页。"""
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': '请先登录'}), 401
+    return redirect(url_for('auth.auth_login', next=request.url))
+
 # 注册路由
 register_routes(app)
 register_api(app)
+
+# ==================== 数据库初始化 ====================
+# gunicorn 下不会进入 __main__，需在导入时确保建表与迁移（配合 --preload 只执行一次）
+if __name__ != '__main__':
+    try:
+        from utils import init_db
+        with app.app_context():
+            init_db()
+    except Exception as _e:  # 数据库暂时不可用时不阻塞启动
+        print(f"[warn] 启动时初始化数据库失败: {_e}")
 
 # ==================== 模板初始化 ====================
 TEMPLATES_DIR = 'templates'

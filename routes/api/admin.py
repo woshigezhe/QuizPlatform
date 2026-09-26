@@ -21,7 +21,7 @@ from models import db, User, Category, Group, Question, QuizRecord, QuizDetail, 
 from utils import admin_required
 from . import api_bp
 from .auth import _api_error, _api_success
-from ..shared import allowed_file as _allowed_file, handle_background_image_upload, handle_question_image_upload
+from ..shared import allowed_file as _allowed_file, handle_background_image_upload, handle_question_image_upload, safe_extract_zip
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
 
@@ -304,6 +304,8 @@ def api_admin_question_delete(id):
     q = db.session.get(Question, id)
     if not q:
         return _api_error('题目不存在', 404)
+    # 先清理关联的答题详情，避免产生孤儿数据
+    QuizDetail.query.filter(QuizDetail.question_id == id).delete(synchronize_session=False)
     db.session.delete(q)
     db.session.commit()
     return _api_success(message='题目已删除')
@@ -353,7 +355,7 @@ def api_admin_import():
             os.makedirs(temp_dir, exist_ok=True)
             
             with zipfile.ZipFile(filepath, 'r') as zf:
-                zf.extractall(temp_dir)
+                safe_extract_zip(zf, temp_dir)
             
             for root, _, files in os.walk(temp_dir):
                 for f in files:
@@ -478,7 +480,7 @@ def api_admin_export():
             '用户名': rec.user.username,
             '开始时间': rec.start_time.strftime('%Y-%m-%d %H:%M:%S') if rec.start_time else '',
             '结束时间': rec.end_time.strftime('%Y-%m-%d %H:%M:%S') if rec.end_time else '',
-            '分类': rec.category.name,
+            '分类': rec.category.name if rec.category else '',
             '得分': rec.score,
             '正确题数': rec.correct_count,
             '总题数': rec.total_questions,
@@ -495,9 +497,9 @@ def api_admin_export():
                 details_data.append({
                     '记录 ID': rec.id,
                     '用户名': rec.user.username,
-                    '题目': det.question.content,
+                    '题目': det.question.content if det.question else '',
                     '用户答案': det.user_answer,
-                    '正确答案': det.question.answer,
+                    '正确答案': det.question.answer if det.question else '',
                     '是否正确': det.is_correct,
                     '得分': det.score_earned
                 })

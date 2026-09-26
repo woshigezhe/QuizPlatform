@@ -220,6 +220,18 @@ echo ""
 
 cd "$PROJECT_DIR" || error "项目目录不存在: $PROJECT_DIR"
 
+# 解析可用的 Python 解释器（优先项目虚拟环境，其次系统 Python；须能 import flask）
+PYBIN=""
+for cand in "${VENV_DIR}/bin/python" python3.11 python3 python; do
+    if command -v "$cand" >/dev/null 2>&1 && "$cand" -c 'import flask' >/dev/null 2>&1; then
+        PYBIN="$cand"; break
+    fi
+done
+if [ -z "$PYBIN" ]; then
+    error "找不到可用的 Python 解释器（需要已安装 Flask）"
+fi
+info "使用解释器: $PYBIN ($("$PYBIN" --version 2>&1))"
+
 # ==================== [1] 拉取代码 ====================
 if [ "$DO_PULL" = true ]; then
     echo "━━━ [1/3] 拉取最新代码 ━━━"
@@ -242,38 +254,35 @@ fi
 if [ "$DO_INSTALL" = true ]; then
     echo "━━━ [2/3] 安装依赖 ━━━"
 
-    if [ -d "$VENV_DIR" ]; then
-        source "$VENV_DIR/bin/activate" 2>/dev/null || true
-        info "虚拟环境已激活"
-    else
+    if [ ! -d "$VENV_DIR" ]; then
         info "创建虚拟环境..."
-        python3 -m venv "$VENV_DIR"
-        source "$VENV_DIR/bin/activate"
+        python3 -m venv "$VENV_DIR" 2>/dev/null || warn "创建虚拟环境失败，改用系统 Python"
+        if [ -x "${VENV_DIR}/bin/python" ] && "${VENV_DIR}/bin/python" -c 'import flask' >/dev/null 2>&1; then
+            PYBIN="${VENV_DIR}/bin/python"
+        fi
     fi
 
     info "升级 pip..."
-    python3 -m pip install --upgrade pip -q 2>/dev/null || true
+    "$PYBIN" -m pip install --upgrade pip -q 2>/dev/null || true
 
     detect_pip_mirror
 
     info "安装/更新项目依赖..."
-    pip install -r requirements.txt --only-binary :all: -q $PIP_INDEX 2>/dev/null || \
-        pip install -r requirements.txt -q $PIP_INDEX 2>/dev/null || \
+    "$PYBIN" -m pip install -r requirements.txt --only-binary :all: -q $PIP_INDEX 2>/dev/null || \
+        "$PYBIN" -m pip install -r requirements.txt -q $PIP_INDEX 2>/dev/null || \
         warn "部分依赖安装失败，继续部署..."
 
     # 确保 gunicorn 已安装
-    if ! command -v gunicorn &> /dev/null; then
+    if ! "$PYBIN" -m gunicorn --version &> /dev/null; then
         info "安装 gunicorn..."
-        pip install gunicorn -q $PIP_INDEX
+        "$PYBIN" -m pip install gunicorn -q $PIP_INDEX
     fi
 
     success "依赖安装完成"
     echo ""
 else
-    # 仍然需要激活虚拟环境
-    if [ -f "$VENV_DIR/bin/activate" ]; then
-        source "$VENV_DIR/bin/activate" 2>/dev/null || true
-    fi
+    # 跳过依赖安装，仅确认解释器可用
+    info "跳过依赖安装 (使用 $PYBIN)"
 fi
 
 # ==================== [3] 重启服务 ====================
@@ -292,11 +301,11 @@ if [ "$DO_RESTART" = true ]; then
 
     # 初始化数据库（如果需要）
     info "检查/初始化数据库..."
-    python3 -c "
+    "$PYBIN" -c "
 from app import app
 from utils import init_db
-with app.app_context():
-    init_db()
+app.app_context().push()
+init_db()
 " 2>/dev/null && success "数据库就绪" || warn "数据库检查跳过"
 
     # 启动新进程
@@ -307,12 +316,14 @@ with app.app_context():
     _error_log="${_log_dir}/gunicorn_error.log"
 
     screen -dmS "$SCREEN_NAME" bash -c "
-source ${VENV_DIR}/bin/activate
+cd ${PROJECT_DIR}
+[ -f .env ] && set -a && . ./.env && set +a
 export ENV=production
 export FLASK_DEBUG=0
 export DATABASE_URL=\"${DATABASE_URL:-}\"
 export DB_PATH=\"${DB_PATH:-}\"
-gunicorn -w ${WORKERS} -b ${HOST}:${PORT} app:app \
+exec ${PYBIN} -m gunicorn -w ${WORKERS} -b ${HOST}:${PORT} app:app \
+    --preload \
     --access-logfile ${_access_log} \
     --error-logfile ${_error_log} \
     --log-level info \
