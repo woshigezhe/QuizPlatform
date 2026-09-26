@@ -3,20 +3,13 @@
 """
 数据库模型
 
-数据分离策略（通过 SQLAlchemy binds 实现）：
-  - bind 'config':  Category, Group, Question（题库配置）
-  - bind 'users':   User（用户账号）
-  - bind 'records': QuizRecord, QuizDetail, UserProgress（答题记录 / 用户进度）
+所有模型共用同一个 SQLAlchemy 元数据（单库模式），
+跨模型 JOIN 与外键约束正常工作。
 
-默认情况下所有 bind 指向同一 SQLite 文件 quiz.db（兼容原有行为），
-跨模型 JOIN 和外键约束正常工作。
-生产环境可通过环境变量分别指定独立数据库实现物理分离：
-  CONFIG_DATABASE_URL  → 题库配置独立存储
-  USERS_DATABASE_URL   → 用户数据独立存储
-  RECORDS_DATABASE_URL → 答题记录独立存储
-
-注意：当 bind 指向不同物理数据库（尤其是不同 SQLite 文件）时，
-跨 bind 的外键约束将失效，需由应用层保证数据一致性。
+注意：Flask-SQLAlchemy 3.x 中若使用 __bind_key__ 做多 bind 分离，
+每个 bind 会创建独立的 MetaData，导致跨 bind 外键无法解析
+（例如 quiz_record.user_id → user.id 会抛 NoReferencedTableError）。
+因此这里不使用 bind，统一使用单一数据库。
 """
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
@@ -26,8 +19,6 @@ db = SQLAlchemy()
 
 
 class User(UserMixin, db.Model):
-    __bind_key__ = 'users'
-
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -43,8 +34,6 @@ class User(UserMixin, db.Model):
 
 
 class Category(db.Model):
-    __bind_key__ = 'config'
-
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
@@ -62,8 +51,6 @@ class Category(db.Model):
 
 class Group(db.Model):
     """题目分组"""
-    __bind_key__ = 'config'
-
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
@@ -79,8 +66,6 @@ class Group(db.Model):
 
 
 class Question(db.Model):
-    __bind_key__ = 'config'
-
     id = db.Column(db.Integer, primary_key=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=True)
@@ -99,8 +84,6 @@ class Question(db.Model):
 
 
 class QuizRecord(db.Model):
-    __bind_key__ = 'records'
-
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
@@ -116,8 +99,6 @@ class QuizRecord(db.Model):
 
 
 class QuizDetail(db.Model):
-    __bind_key__ = 'records'
-
     id = db.Column(db.Integer, primary_key=True)
     record_id = db.Column(db.Integer, db.ForeignKey('quiz_record.id'), nullable=False)
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
@@ -128,8 +109,6 @@ class QuizDetail(db.Model):
 
 class UserProgress(db.Model):
     """用户分组答题进度"""
-    __bind_key__ = 'records'
-
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)

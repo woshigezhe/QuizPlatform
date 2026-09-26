@@ -126,32 +126,10 @@ else:
     SQLALCHEMY_DATABASE_URI = _build_sqlite_uri('quiz.db')
 
 
-# ==================== 数据库绑定（配置/用户/题库数据分离） ====================
-# 三个逻辑数据库按类分离，默认均指向同一数据库（保证跨模型 JOIN 正常工作）
-#   - bind 'config':  Category, Group, Question（题库配置）
-#   - bind 'users':   User（用户账号）
-#   - bind 'records': QuizRecord, QuizDetail, UserProgress（答题记录 / 用户进度）
-#
-# 生产环境可通过环境变量分别指定不同数据库实现物理分离：
-#   CONFIG_DATABASE_URL  → 题库配置
-#   USERS_DATABASE_URL   → 用户数据
-#   RECORDS_DATABASE_URL → 答题记录
-_config_url = os.environ.get('CONFIG_DATABASE_URL', '').strip()
-_users_url = os.environ.get('USERS_DATABASE_URL', '').strip()
-_records_url = os.environ.get('RECORDS_DATABASE_URL', '').strip()
-
-SQLALCHEMY_BINDS = {
-    'config':  _config_url if _config_url else SQLALCHEMY_DATABASE_URI,
-    'users':   _users_url if _users_url else SQLALCHEMY_DATABASE_URI,
-    'records': _records_url if _records_url else SQLALCHEMY_DATABASE_URI,
-}
-
-
 # ==================== Flask 配置类 ====================
 class Config:
     SECRET_KEY = SECRET_KEY
     SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
-    SQLALCHEMY_BINDS = SQLALCHEMY_BINDS
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
     UPLOAD_FOLDER = 'uploads'
@@ -182,5 +160,3 @@ def print_env_info():
     print(f"  数据库: {db_info}")
     if _db_path and not _database_url:
         print(f"  数据库路径: {_db_path}")
-    if IS_PRODUCTION:
-        print(f"  数据分离: {'是' if (_config_url or _users_url or _records_url) else '否（共用同一数据库）'}")
