@@ -36,9 +36,6 @@ jobs:
           python -m py_compile utils.py
           python -m py_compile routes/shared.py
           python -m py_compile routes/__init__.py
-          python -m py_compile routes/auth.py
-          python -m py_compile routes/quiz.py
-          python -m py_compile routes/admin.py
           python -m py_compile routes/api/__init__.py
           python -m py_compile routes/api/auth.py
           python -m py_compile routes/api/quiz.py

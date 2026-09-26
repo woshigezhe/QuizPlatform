@@ -19,6 +19,11 @@ export const adminAPI = {
   deleteQuestion: (id) => request.delete(`/admin/questions/${id}`),
   bulkDeleteQuestions: (ids) => request.post('/admin/questions/bulk-delete', { ids }),
 
+  // 批量导入 / 导出
+  importData: (formData) => request.post('/admin/import', formData),
+  exportData: (params) => request.get('/admin/export', { params, responseType: 'blob' }),
+  importPromptUrl: '/static/import_prompt.txt',
+
   // 用户
   getUsers: () => request.get('/admin/users'),
   toggleUser: (id) => request.post(`/admin/users/${id}/toggle`),

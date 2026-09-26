@@ -15,6 +15,8 @@ const routes = [
   { path: '/admin/groups', name: 'AdminGroups', component: () => import('@/views/admin/Groups.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/questions', name: 'AdminQuestions', component: () => import('@/views/admin/Questions.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/users', name: 'AdminUsers', component: () => import('@/views/admin/Users.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/import', name: 'AdminImport', component: () => import('@/views/admin/Import.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/export', name: 'AdminExport', component: () => import('@/views/admin/Export.vue'), meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

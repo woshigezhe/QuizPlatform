@@ -4,7 +4,7 @@
 辅助函数
 """
 from functools import wraps
-from flask import flash, redirect, url_for, request, jsonify
+from flask import jsonify
 from flask_login import current_user
 from models import db, User
 from config import ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_EMAIL
@@ -15,14 +15,9 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            if request.path.startswith('/api/'):
-                return jsonify({'success': False, 'message': '请先登录'}), 401
-            return redirect(url_for('auth.auth_login', next=request.url))
+            return jsonify({'success': False, 'message': '请先登录'}), 401
         if current_user.role != 'admin':
-            if request.path.startswith('/api/'):
-                return jsonify({'success': False, 'message': '权限不足'}), 403
-            flash('需要管理员权限')
-            return redirect(url_for('quiz.index'))
+            return jsonify({'success': False, 'message': '权限不足'}), 403
         return f(*args, **kwargs)
     return decorated_function
 

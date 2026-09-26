@@ -1,26 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-路由模块
+路由包
+
+说明：服务端渲染（SSR）页面已移除。前端为 Vue SPA（frontend/dist，由 nginx 托管），
+本包仅保留 RESTful API（routes/api）与公共工具（routes/shared）。
 """
-from .auth import auth_bp
-from .quiz import quiz_bp
-from .admin import admin_bp
-
-def register_routes(app):
-    """注册所有路由蓝图"""
-    app.register_blueprint(auth_bp, url_prefix='/')
-    app.register_blueprint(quiz_bp, url_prefix='/')
-    app.register_blueprint(admin_bp, url_prefix='/admin')
-
-    from flask_login import current_user, logout_user
-    from flask import flash, redirect, url_for, request, jsonify
-
-    @app.before_request
-    def check_user_active():
-        if current_user.is_authenticated and not current_user.status:
-            logout_user()
-            if request.path.startswith('/api/'):
-                return jsonify({'success': False, 'message': '账号已被禁用'}), 401
-            flash('账号已被禁用', 'warning')
-            return redirect(url_for('auth.auth_login'))
