@@ -33,7 +33,7 @@
         </el-collapse>
       </el-card>
     </div>
-    <el-empty v-else description="加载结果中..." />
+    <el-empty v-else :description="errorMsg || '加载结果中...'" />
   </div>
 </template>
 
@@ -46,26 +46,33 @@ const route = useRoute()
 const quiz = useQuizStore()
 const loading = ref(false)
 const allCorrect = ref(undefined)
+const errorMsg = ref('')
 
 onMounted(async () => {
   const recId = route.params.recordId
-  
+  if (!recId) {
+    errorMsg.value = '缺少记录 ID'
+    return
+  }
+
   // 保存提交时返回的题组信息（在 fetchResult 覆盖前暂存）
   const savedAllCorrect = quiz.result?.all_correct
   const savedGroupName = quiz.result?.group_name
-  
-  if (recId) {
-    loading.value = true
+
+  loading.value = true
+  try {
     await quiz.fetchResult(parseInt(recId))
-    loading.value = false
-    
     // 恢复题组信息到 result 中
     if (savedAllCorrect !== undefined && quiz.result) {
       quiz.result.all_correct = savedAllCorrect
       quiz.result.group_name = savedGroupName
     }
+  } catch (e) {
+    errorMsg.value = '加载结果失败，请稍后重试'
+  } finally {
+    loading.value = false
+    allCorrect.value = quiz.result?.all_correct
   }
-  allCorrect.value = quiz.result?.all_correct
 })
 </script>
 

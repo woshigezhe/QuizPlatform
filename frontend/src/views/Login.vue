@@ -9,6 +9,9 @@
         <el-input v-model="form.password" type="password" placeholder="请输入密码" show-password @keyup.enter="handleLogin" />
       </el-form-item>
       <el-form-item>
+        <el-checkbox v-model="form.remember">记住我</el-checkbox>
+      </el-form-item>
+      <el-form-item>
         <el-button type="primary" @click="handleLogin" :loading="auth.loading" style="width:100%">登录</el-button>
       </el-form-item>
     </el-form>
@@ -27,7 +30,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const formRef = ref(null)
 
-const form = reactive({ username: '', password: '' })
+const form = reactive({ username: '', password: '', remember: false })
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
@@ -36,7 +39,7 @@ const rules = {
 async function handleLogin() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
-  const ok = await auth.login(form.username, form.password)
+  const ok = await auth.login(form.username, form.password, form.remember)
   if (ok) router.push('/')
 }
 </script>

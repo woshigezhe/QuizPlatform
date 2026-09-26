@@ -152,9 +152,13 @@ class Config:
 def print_env_info():
     """打印当前环境配置摘要"""
     db_info = SQLALCHEMY_DATABASE_URI
-    if '@' in db_info:
-        # 隐藏密码
-        db_info = db_info[:db_info.index(':')] + ':***@' + db_info.split('@', 1)[1]
+    if '://' in db_info and '@' in db_info:
+        # 隐藏密码：scheme://user:***@host/db
+        scheme, rest = db_info.split('://', 1)
+        creds, host = rest.split('@', 1)
+        if ':' in creds:
+            creds = creds.split(':', 1)[0] + ':***'
+        db_info = f'{scheme}://{creds}@{host}'
 
     print(f"  环境: {'🔧 生产环境' if IS_PRODUCTION else '💻 开发环境'}")
     print(f"  数据库: {db_info}")

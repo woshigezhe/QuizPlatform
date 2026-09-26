@@ -21,7 +21,7 @@
           <el-button size="small" :type="row.status ? 'warning' : 'success'" @click="handleToggle(row.id)" v-if="row.role !== 'admin'">
             {{ row.status ? '禁用' : '启用' }}
           </el-button>
-          <el-popconfirm title="确定清除该用户的所有答题历史？" @confirm="handleClear(row.id)">
+          <el-popconfirm v-if="row.role !== 'admin'" title="确定清除该用户的所有答题历史？" @confirm="handleClear(row.id)">
             <template #reference>
               <el-button size="small" type="warning">清除历史</el-button>
             </template>

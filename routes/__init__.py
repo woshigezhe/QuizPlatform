@@ -14,11 +14,13 @@ def register_routes(app):
     app.register_blueprint(admin_bp, url_prefix='/admin')
 
     from flask_login import current_user, logout_user
-    from flask import flash, redirect, url_for
+    from flask import flash, redirect, url_for, request, jsonify
 
     @app.before_request
     def check_user_active():
         if current_user.is_authenticated and not current_user.status:
             logout_user()
+            if request.path.startswith('/api/'):
+                return jsonify({'success': False, 'message': '账号已被禁用'}), 401
             flash('账号已被禁用', 'warning')
             return redirect(url_for('auth.auth_login'))

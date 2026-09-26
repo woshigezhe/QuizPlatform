@@ -21,8 +21,14 @@ request.interceptors.response.use(
     if (error.response) {
       const status = error.response.status
       const serverMsg = error.response.data?.message
+      const url = error.config?.url || ''
       if (status === 401) {
         ElMessage.error(serverMsg || '请先登录')
+        // 登录/注册接口自身报 401 属正常（凭证错误），不跳转
+        const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register')
+        if (!isAuthEndpoint && window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
       } else if (status === 403) {
         ElMessage.error(serverMsg || '权限不足')
       } else if (status === 404) {

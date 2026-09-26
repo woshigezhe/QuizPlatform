@@ -264,6 +264,9 @@ def admin_download_import_prompt():
 @login_required
 @admin_required
 def admin_import():
+    if not HAS_PANDAS:
+        flash('服务器未安装 pandas，无法执行导入')
+        return redirect(url_for('admin.admin_import'))
     if request.method == 'POST':
         file = request.files['file']
         if not file:
@@ -386,7 +389,8 @@ def admin_import():
             db.session.rollback()
             flash(f'导入失败：{str(e)}')
         finally:
-            os.remove(filepath)
+            if os.path.exists(filepath):
+                os.remove(filepath)
             # 清理临时解压目录
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -405,6 +409,9 @@ def admin_export_page():
 @login_required
 @admin_required
 def admin_export():
+    if not HAS_PANDAS:
+        flash('服务器未安装 pandas，无法执行导出')
+        return redirect(url_for('admin.admin_export_page'))
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     category_id = request.args.get('category_id', type=int)

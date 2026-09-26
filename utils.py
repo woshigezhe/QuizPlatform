@@ -27,25 +27,58 @@ def admin_required(f):
     return decorated_function
 
 # ==================== 业务逻辑 ====================
-def check_answer(question, user_answer):
-    """根据题型判断答案是否正确"""
-    if question is None:
+_TRUE_WORDS = {'对', '正确', '是', '真', 'true', 't', 'yes', 'y', '1', '√'}
+_FALSE_WORDS = {'错', '错误', '否', '假', 'false', 'f', 'no', 'n', '0', '×', 'x'}
+
+
+def _normalize_judge(value):
+    """把判断题答案归一化为 True/False；无法识别返回 None。"""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in _TRUE_WORDS:
+        return True
+    if text in _FALSE_WORDS:
         return False
+    return None
+
+
+def check_answer(question, user_answer):
+    """根据题型判断答案是否正确（兼容“对/错”与“正确/错误”等写法）"""
+    if question is None or question.answer is None:
+        return False
+
+    answer = question.answer
+
     if question.type == 'single':
-        return user_answer == question.answer
+        return user_answer == answer
+
     elif question.type == 'multiple':
-        correct = set(question.answer.replace(' ', '').split(','))
+        if user_answer is None:
+            return False
+        correct = {x for x in str(answer).replace(' ', '').split(',') if x}
         if isinstance(user_answer, str):
-            user = set(user_answer.replace(' ', '').split(','))
+            user = {x for x in user_answer.replace(' ', '').split(',') if x}
         else:
             user = set(user_answer)
         return user == correct
+
     elif question.type == 'judge':
-        return user_answer == question.answer
+        correct_bool = _normalize_judge(answer)
+        user_bool = _normalize_judge(user_answer)
+        if correct_bool is None or user_bool is None:
+            return str(user_answer).strip() == str(answer).strip()
+        return correct_bool == user_bool
+
     elif question.type == 'fill':
-        correct_answers = [ans.strip().lower() for ans in question.answer.split('|')]
-        user = user_answer.strip().lower() if user_answer else ''
+        if user_answer is None:
+            return False
+        correct_answers = [a.strip().lower() for a in str(answer).split('|') if a.strip()]
+        user = str(user_answer).strip().lower()
         return user in correct_answers
+
     return False
 
 def init_db():
@@ -56,31 +89,28 @@ def init_db():
     from sqlalchemy import text, inspect
     _migrate_engine = db.engine
     _inspector = inspect(_migrate_engine)
+    _quote = _migrate_engine.dialect.identifier_preparer.quote
+    _group_tbl = _quote('group')
+
+    def _add_column(table_sql, column_sql, desc):
+        with _migrate_engine.connect() as conn:
+            conn.execute(text(f"ALTER TABLE {table_sql} ADD COLUMN {column_sql}"))
+            conn.commit()
+        print(f"已添加 {desc}")
+
     if 'group' in _inspector.get_table_names():
         columns = [col['name'] for col in _inspector.get_columns('group')]
         if 'study_content' not in columns:
-            with _migrate_engine.connect() as conn:
-                conn.execute(text("ALTER TABLE [group] ADD COLUMN study_content TEXT"))
-                conn.commit()
-            print("已添加 group.study_content 列")
+            _add_column(_group_tbl, 'study_content TEXT', 'group.study_content 列')
         if 'unlock_order' not in columns:
-            with _migrate_engine.connect() as conn:
-                conn.execute(text("ALTER TABLE [group] ADD COLUMN unlock_order INTEGER DEFAULT 0"))
-                conn.commit()
-            print("已添加 group.unlock_order 列")
+            _add_column(_group_tbl, 'unlock_order INTEGER DEFAULT 0', 'group.unlock_order 列')
         if 'background_image' not in columns:
-            with _migrate_engine.connect() as conn:
-                conn.execute(text("ALTER TABLE [group] ADD COLUMN background_image VARCHAR(255)"))
-                conn.commit()
-            print("已添加 group.background_image 列")
-    
+            _add_column(_group_tbl, 'background_image VARCHAR(255)', 'group.background_image 列')
+
     if 'question' in _inspector.get_table_names():
         columns = [col['name'] for col in _inspector.get_columns('question')]
         if 'image' not in columns:
-            with _migrate_engine.connect() as conn:
-                conn.execute(text("ALTER TABLE question ADD COLUMN image VARCHAR(255)"))
-                conn.commit()
-            print("已添加 question.image 列")
+            _add_column('question', 'image VARCHAR(255)', 'question.image 列')
     
     if not User.query.filter_by(role='admin').first():
         admin = User(

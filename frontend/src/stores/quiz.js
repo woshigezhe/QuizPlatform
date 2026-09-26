@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { startQuiz, startGroupQuiz, getQuestion, answerQuestion, getResult } from '@/api/quiz'
+import { startQuiz, startGroupQuiz, answerQuestion, getResult } from '@/api/quiz'
 
 export const useQuizStore = defineStore('quiz', () => {
   const recordId = ref(null)

@@ -4,7 +4,7 @@
     <el-table :data="rankedUsers" v-loading="loading" stripe empty-text="暂无数据" style="border-radius: 0.75rem; overflow: hidden">
       <el-table-column label="排名" width="80">
         <template #default="{ row }">
-          <el-tag v-if="row.rank <= 3" :type="['', 'danger', 'warning', 'primary'][row.rank]" size="small">{{ row.rank }}</el-tag>
+          <el-tag v-if="row.rank <= 3" :type="['danger', 'warning', 'primary'][row.rank - 1]" size="small">{{ row.rank }}</el-tag>
           <span v-else>{{ row.rank }}</span>
         </template>
       </el-table-column>

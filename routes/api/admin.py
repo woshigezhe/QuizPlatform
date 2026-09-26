@@ -276,8 +276,12 @@ def api_admin_question_edit(id):
         data = request.form
     
     q.category_id = data.get('category_id', q.category_id)
-    q.group_id = data.get('group_id') or None
-    q.type = data.get('type', q.type)
+    if 'group_id' in data:
+        q.group_id = data.get('group_id') or None
+    new_type = str(data.get('type') or q.type).strip().lower()
+    if new_type not in ('single', 'multiple', 'judge', 'fill'):
+        return _api_error('无效的题型')
+    q.type = new_type
     q.content = data.get('content', q.content)
     
     options = data.get('options', q.options)
@@ -332,6 +336,8 @@ def api_admin_questions_bulk_delete():
 @login_required
 @admin_required
 def api_admin_import():
+    if not HAS_PANDAS:
+        return _api_error('服务器未安装 pandas，无法执行导入')
     file = request.files.get('file')
     if not file:
         return _api_error('请选择文件')
@@ -451,6 +457,8 @@ def api_admin_import():
 @login_required
 @admin_required
 def api_admin_export():
+    if not HAS_PANDAS:
+        return _api_error('服务器未安装 pandas，无法执行导出')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     category_id = request.args.get('category_id', type=int)

@@ -3,7 +3,7 @@
 """
 API 答题接口
 """
-from flask import request, jsonify, session
+from flask import request, session
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 from datetime import datetime
@@ -182,6 +182,11 @@ def api_start_group_quiz():
                     start_index = idx
                 break
     
+    # 标记旧的进行中记录为已放弃，避免悬挂记录
+    QuizRecord.query.filter_by(user_id=current_user.id, end_time=None).update(
+        {QuizRecord.end_time: datetime.utcnow()}, synchronize_session=False
+    )
+
     current_group = group_questions[start_index]
     record = QuizRecord(
         user_id=current_user.id,
@@ -452,6 +457,8 @@ def api_result(record_id):
     
     seconds = (record.end_time - record.start_time).total_seconds() if record.end_time else 0
     
+    all_correct = bool(record.details) and all(d.is_correct for d in record.details)
+
     return _api_success(data={
         'record': {
             'id': record.id,
@@ -466,7 +473,8 @@ def api_result(record_id):
             'minutes': int(seconds // 60),
             'seconds_remainder': round(seconds % 60)
         },
-        'details': details
+        'details': details,
+        'all_correct': all_correct
     })
 
 
