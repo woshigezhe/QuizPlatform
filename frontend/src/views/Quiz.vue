@@ -21,7 +21,7 @@
           </div>
           <div class="d-flex align-center gap-2">
             <el-tag size="small" type="warning" effect="plain" title="本次答题已用时间">
-              <el-icon><Timer /></el-icon> {{ elapsedText }}
+              <el-icon><Timer /></el-icon> 已用 {{ elapsedText }}（{{ elapsedSeconds }} 秒）
             </el-tag>
             <el-tag size="small">{{ typeLabel }}</el-tag>
           </div>
