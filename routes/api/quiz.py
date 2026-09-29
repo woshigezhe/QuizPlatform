@@ -159,7 +159,8 @@ def api_start_group_quiz():
     ).first()
     
     start_index = 0
-    if progress and progress.last_completed_group_id:
+    # 仅在“继续下一组”（未指定 group_id）时推进；指定 group_id 时应重玩该组而不重置进度
+    if progress and progress.last_completed_group_id and not group_id:
         for idx, gq in enumerate(group_questions):
             if gq['group_id'] == progress.last_completed_group_id:
                 if idx == len(group_questions) - 1:
@@ -268,8 +269,14 @@ def api_answer():
     current_index = session.get('current_index', 0)
     
     if qid is not None and answer is not None:
+        try:
+            qid_int = int(qid)
+        except (TypeError, ValueError):
+            return _session_api_error('题目 ID 无效')
+        if qid_int not in question_ids:
+            return _session_api_error('题目不属于当前答题')
         answers = session.get('answers', {})
-        answers[str(qid)] = answer
+        answers[str(qid_int)] = answer
         session['answers'] = answers
         session.modified = True
     
@@ -417,7 +424,15 @@ def _submit_group_internal():
                 category_id=group_info['category_id']
             )
             db.session.add(progress)
-        progress.last_completed_group_id = group_info['group_id']
+            db.session.flush()
+
+        # 仅向前推进进度：重刷旧题组不应导致解锁状态回退
+        completed_group = db.session.get(Group, group_info['group_id'])
+        current_order = (progress.last_completed_group.unlock_order
+                         if progress.last_completed_group else None)
+        if completed_group and (current_order is None
+                                or completed_group.unlock_order >= current_order):
+            progress.last_completed_group_id = group_info['group_id']
         db.session.commit()
     
     keys = ['question_ids', 'group_question_ids', 'current_index', 'answers', 'quiz_record_id', 'group_mode', 'groups', 'current_group']
@@ -569,6 +584,7 @@ def api_leaderboard():
         func.coalesce(func.sum(QuizRecord.total_questions), 0).label('total_questions'),
         func.coalesce(func.sum(QuizRecord.correct_count), 0).label('total_correct')
     ).join(QuizRecord, User.id == QuizRecord.user_id, isouter=True
+    ).filter(User.status.is_(True)
     ).filter((QuizRecord.id.is_(None)) | (QuizRecord.end_time != None)
     ).group_by(User.id).order_by(func.sum(QuizRecord.score).desc()).all()
     

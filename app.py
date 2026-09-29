@@ -8,6 +8,7 @@
 """
 from flask import Flask, jsonify
 from flask_login import LoginManager, current_user, logout_user
+from werkzeug.exceptions import HTTPException
 from config import Config
 from models import db
 from routes.api import register_api
@@ -31,6 +32,33 @@ def unauthorized_handler():
 
 # ==================== 注册 API ====================
 register_api(app)
+
+
+# ==================== 统一 JSON 错误响应 ====================
+# 本服务只提供 API，所有错误（404/405/500 等）都应返回 JSON 而非 HTML 错误页。
+_HTTP_MESSAGES = {
+    400: '请求参数有误',
+    401: '请先登录',
+    403: '权限不足',
+    404: '资源不存在',
+    405: '请求方法不允许',
+    413: '上传内容过大',
+    429: '请求过于频繁',
+}
+
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(e):
+    message = _HTTP_MESSAGES.get(e.code, e.description or '请求失败')
+    return jsonify({'success': False, 'message': message}), e.code
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(e):
+    """兜底 500：回滚数据库会话并返回 JSON。"""
+    db.session.rollback()
+    app.logger.exception('未处理异常: %s', e)
+    return jsonify({'success': False, 'message': '服务器内部错误'}), 500
 
 
 # ==================== 账号禁用即时生效 ====================
