@@ -278,6 +278,20 @@ if [ "$DO_INSTALL" = true ]; then
         "$PYBIN" -m pip install gunicorn -q $PIP_INDEX
     fi
 
+    # 构建前端产物（frontend/dist），避免线上沿用过期前端
+    if [ -f "frontend/package.json" ]; then
+        if command -v npm >/dev/null 2>&1; then
+            info "构建前端 (npm ci && npm run build)..."
+            if ( cd frontend && { [ -f package-lock.json ] && npm ci --silent || npm install --silent; } && npm run build --silent ); then
+                success "前端构建完成 (frontend/dist)"
+            else
+                warn "前端构建失败，将沿用已有 frontend/dist（请手动执行 npm run build）"
+            fi
+        else
+            warn "未检测到 npm，跳过前端构建（将沿用已有 frontend/dist）"
+        fi
+    fi
+
     success "依赖安装完成"
     echo ""
 else

@@ -426,10 +426,10 @@ echo.
 echo   GitHub 访问缓慢/失败时，使用镜像代理克隆:
 echo.
 echo   gitclone.com:
-echo     git clone https://gitclone.com/github.com/xybbb/QuizPlatform.git
+echo     git clone https://gitclone.com/github.com/woshigezhe/QuizPlatform.git
 echo.
 echo   cnpmjs.org:
-echo     git clone https://github.com.cnpmjs.org/xybbb/QuizPlatform.git
+echo     git clone https://github.com.cnpmjs.org/woshigezhe/QuizPlatform.git
 echo.
 echo   克隆后进入项目:
 echo     cd QuizPlatform ^&^& setup.bat

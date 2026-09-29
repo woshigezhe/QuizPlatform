@@ -3,10 +3,12 @@
 """
 路由模块公共工具：输入验证、文件上传辅助函数
 """
-import re
 import os
+import re
+import uuid
 import zipfile
-from werkzeug.utils import secure_filename
+import functools
+from flask import jsonify
 
 USERNAME_MIN_LEN = 3
 USERNAME_MAX_LEN = 20
@@ -15,6 +17,74 @@ EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 USERNAME_REGEX = re.compile(r'^[a-zA-Z0-9_\u4e00-\u9fff]+$')
 
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
+
+
+# ==================== 输入校验辅助 ====================
+class ValidationError(ValueError):
+    """参数校验失败，路由层捕获后统一返回 400。"""
+
+
+def require_int(value, name='参数', default=None, min_value=None, max_value=None):
+    """解析并校验整数字段；失败抛出 ValidationError。"""
+    if value is None or value == '':
+        if default is not None:
+            return default
+        raise ValidationError(f'{name}不能为空')
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        raise ValidationError(f'{name}必须为整数')
+    if min_value is not None and result < min_value:
+        raise ValidationError(f'{name}不能小于 {min_value}')
+    if max_value is not None and result > max_value:
+        raise ValidationError(f'{name}不能大于 {max_value}')
+    return result
+
+
+def optional_int(value, default=None):
+    """宽松解析可选整数；无法转换时返回 default（不抛异常）。"""
+    if value is None or value == '':
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def require_int_list(value, name='参数'):
+    """解析正整数 ID 列表，过滤非法项；结果为空时抛错。"""
+    if not isinstance(value, (list, tuple)):
+        raise ValidationError(f'{name}格式不正确')
+    result = []
+    for item in value:
+        try:
+            result.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    if not result:
+        raise ValidationError(f'{name}不能为空')
+    return result
+
+
+def validate_api(f):
+    """捕获 ValidationError，统一返回 400 JSON。"""
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except ValidationError as e:
+            return jsonify({'success': False, 'message': str(e)}), 400
+    return wrapper
+
+
+def unique_filename(original_name):
+    """基于 UUID 生成安全的唯一文件名，保留原扩展名（兼容中文名）。"""
+    ext = ''
+    if original_name and '.' in original_name:
+        ext = original_name.rsplit('.', 1)[1].lower()
+        if not re.fullmatch(r'[a-z0-9]{1,8}', ext):
+            ext = ''
+    return f"{uuid.uuid4().hex}{'.' + ext if ext else ''}"
 
 
 def validate_registration(username, email, password):
@@ -50,7 +120,7 @@ def allowed_file(filename):
 def handle_background_image_upload(request_files):
     file = request_files.get('background_image')
     if file and file.filename and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
+        filename = unique_filename(file.filename)
         upload_dir = os.path.join('static', 'uploads', 'backgrounds')
         os.makedirs(upload_dir, exist_ok=True)
         filepath = os.path.join(upload_dir, filename)
@@ -62,7 +132,7 @@ def handle_background_image_upload(request_files):
 def handle_question_image_upload(request_files):
     file = request_files.get('question_image')
     if file and file.filename and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
+        filename = unique_filename(file.filename)
         upload_dir = os.path.join('static', 'uploads', 'questions')
         os.makedirs(upload_dir, exist_ok=True)
         filepath = os.path.join(upload_dir, filename)

@@ -21,7 +21,16 @@ from models import db, User, Category, Group, Question, QuizRecord, QuizDetail, 
 from utils import admin_required
 from . import api_bp
 from .auth import _api_error, _api_success
-from ..shared import allowed_file as _allowed_file, handle_background_image_upload, handle_question_image_upload, safe_extract_zip
+from ..shared import (
+    handle_background_image_upload,
+    handle_question_image_upload,
+    safe_extract_zip,
+    require_int,
+    optional_int,
+    require_int_list,
+    unique_filename,
+    validate_api,
+)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'}
 
@@ -61,7 +70,7 @@ def api_admin_category_add():
     name = data.get('name', '').strip()
     if not name:
         return _api_error('分类名称不能为空')
-    cat = Category(name=name, parent_id=data.get('parent_id'))
+    cat = Category(name=name, parent_id=optional_int(data.get('parent_id')))
     db.session.add(cat)
     db.session.commit()
     return _api_success(data={'id': cat.id, 'name': cat.name}, message='分类添加成功')
@@ -120,25 +129,30 @@ def api_admin_groups():
 @api_bp.route('/admin/groups', methods=['POST'])
 @login_required
 @admin_required
+@validate_api
 def api_admin_group_add():
     if request.is_json:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         background_image = data.get('background_image')
     else:
         data = request.form
         background_image = _handle_bg_image()
     
-    name = data.get('name', '').strip()
+    name = (data.get('name') or '').strip()
     if not name:
         return _api_error('分组名称不能为空')
     
+    category_id = require_int(data.get('category_id'), '分类')
+    if not db.session.get(Category, category_id):
+        return _api_error('分类不存在', 404)
+    
     group = Group(
         name=name,
-        category_id=data.get('category_id'),
-        order=int(data.get('order', 0)),
+        category_id=category_id,
+        order=require_int(data.get('order'), '排序', default=0),
         description=data.get('description', ''),
         study_content=data.get('study_content', ''),
-        unlock_order=int(data.get('unlock_order', 0)),
+        unlock_order=require_int(data.get('unlock_order'), '解锁序号', default=0, min_value=0),
         background_image=background_image
     )
     db.session.add(group)
@@ -149,22 +163,28 @@ def api_admin_group_add():
 @api_bp.route('/admin/groups/<int:id>', methods=['PUT'])
 @login_required
 @admin_required
+@validate_api
 def api_admin_group_edit(id):
     group = db.session.get(Group, id)
     if not group:
         return _api_error('分组不存在', 404)
     
     if request.is_json:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
     else:
         data = request.form
     
-    group.name = data.get('name', group.name)
-    group.category_id = data.get('category_id', group.category_id)
-    group.order = int(data.get('order', group.order))
+    group.name = data.get('name') or group.name
+    if 'category_id' in data and data.get('category_id') not in (None, ''):
+        category_id = require_int(data.get('category_id'), '分类')
+        if not db.session.get(Category, category_id):
+            return _api_error('分类不存在', 404)
+        group.category_id = category_id
+    group.order = require_int(data.get('order'), '排序', default=group.order)
     group.description = data.get('description', group.description)
     group.study_content = data.get('study_content', group.study_content)
-    group.unlock_order = int(data.get('unlock_order', group.unlock_order))
+    group.unlock_order = require_int(data.get('unlock_order'), '解锁序号',
+                                     default=group.unlock_order, min_value=0)
     
     bg_image = _handle_bg_image()
     if bg_image:
@@ -227,35 +247,40 @@ def api_admin_questions():
 @api_bp.route('/admin/questions', methods=['POST'])
 @login_required
 @admin_required
+@validate_api
 def api_admin_question_add():
     if request.is_json:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         image = data.get('image')
     else:
         data = request.form
         image = _handle_q_image()
     
-    qtype = data.get('type', '').strip().lower()
-    content = data.get('content', '').strip()
+    qtype = (data.get('type') or '').strip().lower()
+    content = (data.get('content') or '').strip()
     if not content:
         return _api_error('题目内容不能为空')
     if qtype not in ('single', 'multiple', 'judge', 'fill'):
         return _api_error('无效的题型')
+    
+    category_id = require_int(data.get('category_id'), '分类')
+    if not db.session.get(Category, category_id):
+        return _api_error('分类不存在', 404)
     
     options = data.get('options', [])
     if isinstance(options, str):
         options = [line.strip() for line in options.splitlines() if line.strip()]
     
     q = Question(
-        category_id=data.get('category_id'),
-        group_id=data.get('group_id') or None,
+        category_id=category_id,
+        group_id=optional_int(data.get('group_id')),
         type=qtype,
         content=content,
         image=image,
         options=options if qtype not in ('judge', 'fill') else [],
         answer=data.get('answer', ''),
         analysis=data.get('analysis', ''),
-        difficulty=int(data.get('difficulty', 1))
+        difficulty=require_int(data.get('difficulty'), '难度', default=1, min_value=1, max_value=5)
     )
     db.session.add(q)
     db.session.commit()
@@ -265,24 +290,29 @@ def api_admin_question_add():
 @api_bp.route('/admin/questions/<int:id>', methods=['PUT'])
 @login_required
 @admin_required
+@validate_api
 def api_admin_question_edit(id):
     q = db.session.get(Question, id)
     if not q:
         return _api_error('题目不存在', 404)
     
     if request.is_json:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
     else:
         data = request.form
     
-    q.category_id = data.get('category_id', q.category_id)
+    if 'category_id' in data and data.get('category_id') not in (None, ''):
+        category_id = require_int(data.get('category_id'), '分类')
+        if not db.session.get(Category, category_id):
+            return _api_error('分类不存在', 404)
+        q.category_id = category_id
     if 'group_id' in data:
-        q.group_id = data.get('group_id') or None
+        q.group_id = optional_int(data.get('group_id'))
     new_type = str(data.get('type') or q.type).strip().lower()
     if new_type not in ('single', 'multiple', 'judge', 'fill'):
         return _api_error('无效的题型')
     q.type = new_type
-    q.content = data.get('content', q.content)
+    q.content = data.get('content') or q.content
     
     options = data.get('options', q.options)
     if isinstance(options, str):
@@ -291,7 +321,8 @@ def api_admin_question_edit(id):
     
     q.answer = data.get('answer', q.answer)
     q.analysis = data.get('analysis', q.analysis)
-    q.difficulty = int(data.get('difficulty', q.difficulty))
+    q.difficulty = require_int(data.get('difficulty'), '难度', default=q.difficulty,
+                               min_value=1, max_value=5)
     
     image = _handle_q_image()
     if image:
@@ -318,11 +349,10 @@ def api_admin_question_delete(id):
 @api_bp.route('/admin/questions/bulk-delete', methods=['POST'])
 @login_required
 @admin_required
+@validate_api
 def api_admin_questions_bulk_delete():
     data = request.get_json(silent=True) or {}
-    question_ids = data.get('ids', [])
-    if not question_ids:
-        return _api_error('请至少选择一道题目')
+    question_ids = require_int_list(data.get('ids'), '题目')
     
     QuizDetail.query.filter(QuizDetail.question_id.in_(question_ids)).delete(synchronize_session=False)
     Question.query.filter(Question.id.in_(question_ids)).delete(synchronize_session=False)
@@ -342,13 +372,14 @@ def api_admin_import():
     if not file:
         return _api_error('请选择文件')
     
-    is_zip = file.filename.endswith('.zip')
-    is_single = file.filename.endswith(('.xlsx', '.xls', '.csv'))
+    lower_name = file.filename.lower()
+    is_zip = lower_name.endswith('.zip')
+    is_single = lower_name.endswith(('.xlsx', '.xls', '.csv'))
     
     if not (is_zip or is_single):
         return _api_error('请上传 .zip 压缩包 或 .xlsx/.xls/.csv 文件')
     
-    filename = secure_filename(file.filename)
+    filename = unique_filename(file.filename)
     filepath = os.path.join('uploads', filename)
     file.save(filepath)
     
@@ -410,7 +441,9 @@ def api_admin_import():
             answer = str(row['正确答案']).strip()
             content = str(row['题干']).strip()
             analysis = str(row.get('解析', '')).strip() if pd.notna(row.get('解析')) else ''
-            difficulty = int(row.get('难度', 1)) if pd.notna(row.get('难度')) else 1
+            difficulty = optional_int(row.get('难度'), 1)
+            if not 1 <= difficulty <= 5:
+                difficulty = 1
             
             image_filename = str(row.get('题目图片', '')).strip() if pd.notna(row.get('题目图片')) else ''
             image = None

@@ -31,7 +31,7 @@
       <!-- 单选题 -->
       <div v-if="quiz.currentQuestion.type === 'single'" class="options-list">
         <el-radio-group v-model="answer" class="w-100">
-          <el-radio v-for="opt in quiz.currentQuestion.options" :key="opt" :value="opt[0]" :label="opt[0]" class="option-item">
+          <el-radio v-for="opt in quiz.currentQuestion.options" :key="opt" :value="optionValue(opt)" :label="optionValue(opt)" class="option-item">
             {{ opt }}
           </el-radio>
         </el-radio-group>
@@ -40,7 +40,7 @@
       <!-- 多选题 -->
       <div v-if="quiz.currentQuestion.type === 'multiple'" class="options-list">
         <el-checkbox-group v-model="multiAnswer" class="w-100">
-          <el-checkbox v-for="opt in quiz.currentQuestion.options" :key="opt" :value="opt[0]" :label="opt[0]" class="option-item">
+          <el-checkbox v-for="opt in quiz.currentQuestion.options" :key="opt" :value="optionValue(opt)" :label="optionValue(opt)" class="option-item">
             {{ opt }}
           </el-checkbox>
         </el-checkbox-group>
@@ -130,6 +130,12 @@ watch(() => quiz.result, (val) => {
     router.push(`/result/${val.record_id}`)
   }
 })
+
+// 选项值：形如 "A.xxx" / "A、xxx" 时取字母 A，否则取整个选项文本
+function optionValue(opt) {
+  const m = String(opt).match(/^\s*([A-Za-z])\s*[.、)．:：]/)
+  return m ? m[1] : String(opt).trim()
+}
 
 function getCurrentAnswer() {
   return quiz.currentQuestion?.type === 'multiple' ? [...multiAnswer.value] : answer.value

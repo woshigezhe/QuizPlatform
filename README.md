@@ -7,11 +7,10 @@
 | 层级 | 技术 |
 |------|------|
 | Web框架 | Flask |
-| ORM | SQLAlchemy (Flask-SQLAlchemy, 多 bind 支持) |
+| ORM | SQLAlchemy (Flask-SQLAlchemy，单库模式) |
 | 认证 | Flask-Login |
-| 模板引擎 | Jinja2 |
+| 前端 | Vue 3 + Vite + Pinia + Element Plus + vue-router |
 | 数据库 | 默认 SQLite，支持 MySQL/PostgreSQL |
-| 数据分离 | 配置 / 用户 / 题库数据可分离存储 |
 | 数据导入导出 | pandas + openpyxl |
 
 ## 项目结构
@@ -22,12 +21,9 @@ QuizPlatform/
 ├── config.py           # 配置管理（密钥、数据库URI、管理员账号）
 ├── models.py           # 数据库模型（7张核心表）
 ├── utils.py            # 辅助函数（权限装饰器、答案判定、数据库初始化）
-├── routes/             # 路由模块
-│   ├── __init__.py     # 路由注册中心（Flask蓝图 + 全局中间件）
+├── routes/             # 路由模块（仅保留 RESTful API）
+│   ├── __init__.py     # 路由包说明
 │   ├── shared.py       # 公共工具（输入验证、文件上传辅助函数）
-│   ├── auth.py         # 认证路由（登录/注册/注销）
-│   ├── quiz.py         # 核心答题路由（答题/分组/排行榜/学习路线）
-│   ├── admin.py        # 管理后台路由（CRUD + 导入导出 + 用户管理）
 │   └── api/            # RESTful API 路由（前后端分离）
 │       ├── __init__.py # API 蓝图注册
 │       ├── auth.py     # API 认证接口
@@ -41,31 +37,10 @@ QuizPlatform/
 │   │   └── router/     # Vue Router 路由配置
 │   ├── package.json
 │   └── vite.config.js
-├── templates/          # Jinja2 HTML 模板（传统服务端渲染）
-│   ├── base.html       # 基础布局（玻璃拟态 + 动态背景）
-│   ├── index.html      # 首页（分类展示）
-│   ├── login.html      # 登录页
-│   ├── register.html   # 注册页
-│   ├── quiz.html       # 答题页
-│   ├── result.html     # 答题结果页（全对动画）
-│   ├── history.html    # 答题历史记录
-│   ├── roadmap.html    # 题组学习路线图
-│   ├── study.html      # 学习资料页
-│   ├── leaderboard.html # 排行榜（领奖台 + 排名表）
-│   └── admin/          # 管理后台模板
-│       ├── dashboard.html
-│       ├── categories.html
-│       ├── groups.html
-│       ├── group_form.html
-│       ├── questions.html
-│       ├── question_form.html
-│       ├── import.html
-│       ├── export.html
-│       ├── users.html
-│       └── history.html
-├── static/             # 静态资源（CSS/JS/图标/背景图）
+├── static/             # 静态资源（图标 / 上传文件 / 导入提示词）
 │   ├── import_prompt.txt
-│   └── icons/
+│   ├── icons/
+│   └── uploads/        # 题组背景图、题目配图（运行时生成）
 ├── uploads/            # 上传文件目录
 ├── instance/           # SQLite 数据库文件（运行时生成）
 ├── requirements.txt    # Python 依赖
@@ -114,14 +89,28 @@ cd QuizPlatform
 # 国内网络慢可用镜像：
 #   git clone https://gitclone.com/github.com/woshigezhe/QuizPlatform.git
 
-# 安装依赖（--only-binary 可避免需要 C++ 编译器）
+# 安装后端依赖（--only-binary 可避免需要 C++ 编译器）
 pip install -r requirements.txt --only-binary :all:
 
-# 运行应用
+# 启动后端 API 服务（仅提供 /api 与 /static，不渲染页面）
 python app.py
 ```
 
-访问 **http://127.0.0.1:8000**
+前端为独立的 Vue 3 单页应用，需单独启动：
+
+```bash
+cd frontend
+npm install
+
+# 开发模式：访问 http://localhost:3000（已将 /api、/static 代理到 8000）
+npm run dev
+
+# 或构建生产产物到 frontend/dist，由 nginx 托管
+npm run build
+```
+
+- 开发环境：后端 `http://127.0.0.1:8000`，前端 `http://localhost:3000`
+- 生产环境：`npm run build` 生成 `frontend/dist`，由 nginx 托管并把 `/api`、`/static` 反向代理到后端
 
 ### 默认管理员
 
@@ -267,11 +256,13 @@ export ADMIN_EMAIL=admin@yourdomain.com
 
 ## 架构说明
 
-本项目采用 MVC 分层架构 + RESTful API 双模式设计：
+本项目采用前后端分离架构：
 
-- **传统服务端渲染**：`routes/` 目录下的 Flask 蓝图 + Jinja2 模板，适合直接部署使用
-- **前后端分离**：`routes/api/` 目录下的 RESTful API + `frontend/` 目录下的 Vue 3 单页应用
-- **公共模块**：`routes/shared.py` 消除路由层和 API 层的代码重复（输入验证、文件上传）
+- **后端**：Flask 仅提供 RESTful API（`routes/api/`）与静态资源，不负责页面渲染
+- **前端**：`frontend/` 下的 Vue 3 单页应用，构建产物 `frontend/dist` 由 nginx 托管
+- **公共模块**：`routes/shared.py` 提供输入校验、文件上传、ZIP 安全解压等公共逻辑
+
+> 说明：服务端渲染（Jinja2 模板）与多数据库 bind 数据分离方案已在早期版本移除，当前为单库 + 纯 API 模式。
 
 ## 安全特性
 

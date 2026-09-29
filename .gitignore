@@ -5,6 +5,7 @@ uploads
 instance/*.db
 .env
 *.pyc
+*.log
 venv/
 .commandcode/
 node_modules/

@@ -469,8 +469,8 @@ github_clone_helper() {
     echo ""
 
     local mirrors=(
-        "gitclone.com      | git clone https://gitclone.com/github.com/xybbb/QuizPlatform.git"
-        "cnpmjs.org        | git clone https://github.com.cnpmjs.org/xybbb/QuizPlatform.git"
+        "gitclone.com      | git clone https://gitclone.com/github.com/woshigezhe/QuizPlatform.git"
+        "cnpmjs.org        | git clone https://github.com.cnpmjs.org/woshigezhe/QuizPlatform.git"
     )
 
     for entry in "${mirrors[@]}"; do

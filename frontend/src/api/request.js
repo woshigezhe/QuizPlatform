@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import router from '@/router'
 
 const request = axios.create({
   baseURL: '/api',
@@ -26,8 +27,8 @@ request.interceptors.response.use(
         ElMessage.error(serverMsg || '请先登录')
         // 登录/注册接口自身报 401 属正常（凭证错误），不跳转
         const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register')
-        if (!isAuthEndpoint && window.location.pathname !== '/login') {
-          window.location.href = '/login'
+        if (!isAuthEndpoint && router.currentRoute.value.path !== '/login') {
+          router.push('/login')
         }
       } else if (status === 403) {
         ElMessage.error(serverMsg || '权限不足')
