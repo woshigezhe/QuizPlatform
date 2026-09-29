@@ -19,7 +19,12 @@
             </el-tag>
             <el-tag type="primary">{{ quiz.currentIndex + 1 }}/{{ quiz.totalQuestions }}</el-tag>
           </div>
-          <el-tag size="small">{{ typeLabel }}</el-tag>
+          <div class="d-flex align-center gap-2">
+            <el-tag size="small" type="warning" effect="plain" title="本次答题已用时间">
+              <el-icon><Timer /></el-icon> {{ elapsedText }}
+            </el-tag>
+            <el-tag size="small">{{ typeLabel }}</el-tag>
+          </div>
         </div>
       </template>
 
@@ -83,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuizStore } from '@/stores/quiz'
 
@@ -91,6 +96,25 @@ const router = useRouter()
 const quiz = useQuizStore()
 const answer = ref('')
 const multiAnswer = ref([])
+
+// 实时计时：以服务端返回的已用秒数为基准，本地每秒累加
+const now = ref(Date.now())
+let timer = null
+
+const elapsedSeconds = computed(() => {
+  const base = quiz.elapsedBase || 0
+  if (!quiz.elapsedBaseAt) return base
+  return base + Math.floor((now.value - quiz.elapsedBaseAt) / 1000)
+})
+
+const elapsedText = computed(() => {
+  const s = Math.max(0, elapsedSeconds.value)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  const pad = (n) => String(n).padStart(2, '0')
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`
+})
 
 const typeLabel = computed(() => {
   const m = { single: '单选', multiple: '多选', judge: '判断', fill: '填空' }
@@ -104,6 +128,15 @@ onMounted(() => {
     } else {
       answer.value = quiz.savedAnswer
     }
+  }
+  now.value = Date.now()
+  timer = setInterval(() => { now.value = Date.now() }, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
   }
 })
 
@@ -171,6 +204,7 @@ function goBack() {
 .d-flex { display: flex; }
 .justify-between { justify-content: space-between; }
 .align-center { align-items: center; }
+.gap-2 { gap: 8px; }
 .gap-3 { gap: 1rem; }
 .w-100 { width: 100%; }
 </style>

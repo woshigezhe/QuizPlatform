@@ -13,6 +13,15 @@ export const useQuizStore = defineStore('quiz', () => {
   const loading = ref(false)
   const submitting = ref(false)
   const result = ref(null)
+  const elapsedBase = ref(0)      // 服务端返回的已用秒数
+  const elapsedBaseAt = ref(0)    // 收到该数值时的本地时间戳
+
+  // 用服务端时间作为基准，前端本地累加，避免时钟偏差/时区问题
+  function setElapsed(seconds) {
+    if (typeof seconds !== 'number') return
+    elapsedBase.value = seconds
+    elapsedBaseAt.value = Date.now()
+  }
 
   const progress = computed(() => {
     if (totalQuestions.value === 0) return 0
@@ -35,6 +44,7 @@ export const useQuizStore = defineStore('quiz', () => {
       totalQuestions.value = d.total
       savedAnswer.value = null
       result.value = null
+      setElapsed(d.elapsed)
     } catch {
       // handled by interceptor
     } finally {
@@ -55,6 +65,7 @@ export const useQuizStore = defineStore('quiz', () => {
       totalQuestions.value = d.total
       savedAnswer.value = null
       result.value = null
+      setElapsed(d.elapsed)
     } catch {
       // handled by interceptor
     } finally {
@@ -76,6 +87,7 @@ export const useQuizStore = defineStore('quiz', () => {
         currentIndex.value = d.index
         savedAnswer.value = d.saved_answer
       }
+      setElapsed(d.elapsed)
       return d
     } catch {
       return null
@@ -104,12 +116,14 @@ export const useQuizStore = defineStore('quiz', () => {
     totalQuestions.value = 0
     savedAnswer.value = null
     result.value = null
+    elapsedBase.value = 0
+    elapsedBaseAt.value = 0
   }
 
   return {
     recordId, groupMode, groupName,
     currentQuestion, currentIndex, totalQuestions, savedAnswer,
-    loading, submitting, result,
+    loading, submitting, result, elapsedBase, elapsedBaseAt,
     progress, isLast, isFirst,
     start, startGroup, answer, fetchResult, reset
   }

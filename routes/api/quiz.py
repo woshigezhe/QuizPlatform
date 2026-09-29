@@ -28,6 +28,13 @@ def _question_to_dict(q, include_answer=False):
     return result
 
 
+def _elapsed_seconds(record):
+    """返回该答题记录已用秒数（服务端时间，避免客户端时钟偏差影响）。"""
+    if not record or not record.start_time:
+        return 0
+    return max(0, int((datetime.utcnow() - record.start_time).total_seconds()))
+
+
 def _session_api_error(message, code=400):
     """带 session 清理的错误响应"""
     session.pop('quiz_record_id', None)
@@ -115,7 +122,8 @@ def api_start_quiz():
         'record_id': record.id,
         'total': len(questions),
         'question': _question_to_dict(questions[0]),
-        'index': 0
+        'index': 0,
+        'elapsed': _elapsed_seconds(record)
     })
 
 
@@ -215,7 +223,8 @@ def api_start_group_quiz():
         'group_id': current_group['group_id'],
         'total': len(current_group['question_ids']),
         'question': _question_to_dict(first_q),
-        'index': 0
+        'index': 0,
+        'elapsed': _elapsed_seconds(record)
     })
 
 
@@ -238,12 +247,16 @@ def api_get_question():
     
     saved_answer = session.get('answers', {}).get(str(qid))
     
+    record_id = session.get('quiz_record_id')
+    record = db.session.get(QuizRecord, record_id) if record_id else None
+    
     return _api_success(data={
         'question': _question_to_dict(question),
         'index': current_index,
         'total': len(question_ids),
         'saved_answer': saved_answer,
-        'group_mode': session.get('group_mode', False)
+        'group_mode': session.get('group_mode', False),
+        'elapsed': _elapsed_seconds(record)
     })
 
 
@@ -268,6 +281,10 @@ def api_answer():
     
     current_index = session.get('current_index', 0)
     
+    record_id = session.get('quiz_record_id')
+    record = db.session.get(QuizRecord, record_id) if record_id else None
+    elapsed = _elapsed_seconds(record)
+    
     if qid is not None and answer is not None:
         try:
             qid_int = int(qid)
@@ -291,7 +308,8 @@ def api_answer():
             'question': _question_to_dict(next_q),
             'index': current_index + 1,
             'total': len(question_ids),
-            'saved_answer': saved
+            'saved_answer': saved,
+            'elapsed': elapsed
         })
     elif action == 'prev' and current_index > 0:
         session['current_index'] = current_index - 1
@@ -304,7 +322,8 @@ def api_answer():
             'question': _question_to_dict(prev_q),
             'index': current_index - 1,
             'total': len(question_ids),
-            'saved_answer': saved
+            'saved_answer': saved,
+            'elapsed': elapsed
         })
     elif action == 'submit':
         if group_mode:
